@@ -1820,7 +1820,7 @@ function renderCart() {
           ${savings > 0 ? `<div class="billing-row"><span>Catalog Savings</span><span style="color:var(--success)">−${fmt(savings)}</span></div>` : ''}
           <div class="billing-row"><span>Blended GST (12%)</span><span>${fmt(taxes)}</span></div>
           <div class="billing-row"><span>Convenience Fee (0.5%)</span><span>${fmt(convFee)}</span></div>
-          <div class="billing-row"><span>Express Delivery</span><span style="${freeDelivery?'color:var(--gold)'}">${freeDelivery?'FREE':'₹29.00'}</span></div>
+          <div class="billing-row"><span>Express Delivery</span><span style="${freeDelivery?'color:var(--gold)':''}">${freeDelivery?'FREE':'₹29.00'}</span></div>
           ${couponDiscount > 0 ? `<div class="billing-row"><span>Promo: ${appState.appliedCoupon}</span><span style="color:var(--success)">−${fmt(couponDiscount)}</span></div>` : ''}
           <div class="billing-row" style="border-top:1px solid var(--dark-border);margin-top:8px;padding-top:12px">
             <span style="font-weight:700;font-size:15px">Total Payable</span>
