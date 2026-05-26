@@ -858,3 +858,1647 @@ body {
   display: none;
 }
 </style></head><body><div id="app-wrapper"><div id="toast-container"></div><div id="modal-overlay"></div><div id="screen" id="screen"></div><nav id="bottom-nav"></nav></div>
+<script>
+const GEMINI_API_KEY = 'MY_GEMINI_API_KEY'; // Replace with real key to enable live AI
+
+// ── APP STATE ──────────────────────────────────────────────────────────────────
+const appState = {
+  currentScreen: 'home',
+  selectedCategory: 'All',
+  searchQuery: '',
+  checkedPincode: '560001',
+  isServiceable: true,
+  filterVegan: false,
+  filterKeto: false,
+  filterOrganic: false,
+  cart: {},
+  wishlist: new Set(),
+  appliedCoupon: null,
+  couponError: null,
+  selectedPaymentMethod: 'Wallet',
+  selectedDeliverySlot: 'Express (10-45 mins)',
+  orders: [],
+  activeOrderId: null,
+  chatMessages: [],
+  chatLoading: false,
+  selectedLipstickHex: '#D4AF37',
+  isDarkTheme: true,
+  profile: {
+    name: 'Mayank',
+    email: 'mayank@maisonlux.com',
+    phone: '+91 98765 43210',
+    walletBalance: 5000.00,
+    loyaltyPoints: 420,
+    loyaltyTier: 'Silver',
+    pincode: '560001',
+    savedAddress: '12, Lavelle Road, UB City, Bangalore — 560001',
+    referralCode: 'MLUXMAYANK',
+    isSubscribedLuxBox: false,
+    subscribedBoxType: null
+  },
+  navigationDetail: null,
+  navigationOrder: null,
+  adminCouponInput: '',
+  adminWalletInput: '1500',
+  customCoupons: [],
+  detailTab: 'description',
+  driverMessages: [{ sender: 'driver', content: 'On my way, sir! ETA ~8 minutes.', time: new Date() }],
+  trackingAnimFrame: null,
+  trackingStep: 0,
+};
+
+// ── COUPON DATABASE ────────────────────────────────────────────────────────────
+const BASE_COUPONS = {
+  'WELCOME':    { type: 'flat', value: 250 },
+  'AMEXGOLD':   { type: 'percent', value: 15 },
+  'MLUXMAYANK': { type: 'flat', value: 200 },
+};
+
+function getCouponDiscount(code, subtotal) {
+  const all = { ...BASE_COUPONS };
+  appState.customCoupons.forEach(c => { all[c] = { type: 'flat', value: 100 }; });
+  const coupon = all[code];
+  if (!coupon) return null;
+  if (coupon.type === 'flat') return coupon.value;
+  if (coupon.type === 'percent') return Math.round(subtotal * coupon.value / 100);
+  return 0;
+}
+
+// ── PRODUCTS CATALOG ──────────────────────────────────────────────────────────
+const PRODUCTS = [
+  // GROCERIES (EXOTIC)
+  {
+    id: 'p_truffle', name: 'Italian White Truffle (Alba)', brand: 'Tartufi Morra',
+    category: 'Groceries (Exotic)', subcategory: 'Fresh Produce',
+    country: 'Italy', flag: '🇮🇹',
+    price: 12500, mrp: 15000, discount: 16, rating: 4.9, reviewCount: 42,
+    image: 'https://images.unsplash.com/photo-1514190051997-0f6f39ca5cde?w=400&h=300&fit=crop&auto=format',
+    description: 'Freshly harvested white winter truffles directly from the forests of Alba, Piedmont. Characterized by an intense, gas-like, garlic-honey aroma. Shaved raw over fine risottos or scrambled eggs, they melt into absolute gourmet perfection.',
+    ingredients: '100% Organically foraged White Truffles (Tuber magnatum pico)',
+    factsOrUsage: 'Serving size: 5g | Shelf life: 7 days | Maintain between 2–4°C wrapped in paper towel.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_mango', name: 'Japanese Miyazaki Mango', brand: 'Taiyo no Tamago',
+    category: 'Groceries (Exotic)', subcategory: 'Fresh Fruit',
+    country: 'Japan', flag: '🇯🇵',
+    price: 4500, mrp: 5000, discount: 10, rating: 4.8, reviewCount: 19,
+    image: 'https://images.unsplash.com/photo-1601493700631-2d16fa3b8d9f?w=400&h=300&fit=crop&auto=format',
+    description: 'The high-end egg of the sun representing Japanese agricultural supremacy. Tree-ripened to guarantee a sugar content of 15% or above. The texture is completely fibreless, melting in your mouth like silk peach cream.',
+    ingredients: '100% Tree-ripened export grade Miyazaki mango',
+    factsOrUsage: 'Calories: 60 per 100g | Rich in Vitamin A & C | Premium presentation wooden box included. Serve chilled.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_saffron', name: 'Kashmiri Mongra Saffron', brand: 'Zaran Saffron',
+    category: 'Groceries (Exotic)', subcategory: 'Spices & Herbs',
+    country: 'India', flag: '🇮🇳',
+    price: 850, mrp: 1000, discount: 15, rating: 4.7, reviewCount: 85,
+    image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&h=300&fit=crop&auto=format',
+    description: 'The rarest grade of Kashmiri saffron — Mongra — hand-picked at dawn during a 3-week annual harvest window. Deep crimson threads with an intense floral-honey aroma and a beautiful golden colour payoff.',
+    ingredients: 'Pure Crocus sativus Mongra grade saffron threads',
+    factsOrUsage: '0.1g per cup of warm milk | Store in airtight glass jar away from light | Use within 12 months.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_honey', name: 'Royal Yemeni Sidr Honey', brand: 'Balqees Honey',
+    category: 'Groceries (Exotic)', subcategory: 'Pantry Essentials',
+    country: 'Yemen', flag: '🇾🇪',
+    price: 4200, mrp: 5000, discount: 16, rating: 4.9, reviewCount: 37,
+    image: 'https://images.unsplash.com/photo-1587049633312-d628ae50a8ae?w=400&h=300&fit=crop&auto=format',
+    description: 'Sourced from ancient Sidr trees in the Hadramaut Valley. Dense, caramel-like texture with notes of dried fruit and warm spice. Used medicinally in Arab royalty for centuries. Certified raw & unprocessed.',
+    ingredients: '100% Raw unfiltered Sidr honey (Ziziphus spina-christi)',
+    factsOrUsage: 'Calories: 64 per 15ml | Contains natural enzymes & antioxidants | Do not feed to infants under 12 months.',
+    isDietVegan: false, isDietOrganic: true, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  // SNACKS
+  {
+    id: 'p_gold_chocolate', name: '24K Gold Dark Chocolate Truffles', brand: "Maison d'Or",
+    category: 'Snacks', subcategory: 'Chocolates',
+    country: 'France', flag: '🇫🇷',
+    price: 3200, mrp: 4000, discount: 20, rating: 4.9, reviewCount: 56,
+    image: 'https://images.unsplash.com/photo-1548907040-4baa42d10919?w=400&h=300&fit=crop&auto=format',
+    description: 'Hand-rolled 72% dark chocolate truffles finished with edible 24-karat gold leaf. Ganache filled with aged cognac and Fleur de Sel. Presented in a black lacquered gift box. The ultimate indulgence.',
+    ingredients: '72% Dark Chocolate (Criollo), Fresh Cream, Cognac, Fleur de Sel, 24K Edible Gold Leaf',
+    factsOrUsage: 'Box of 6 | Calories: 90 per piece | Store below 18°C | Best consumed within 10 days.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: false, colorHex: null,
+  },
+  {
+    id: 'p_caviar_chips', name: 'Caviar Potato Crisps', brand: 'Torres',
+    category: 'Snacks', subcategory: 'Chips & Savory',
+    country: 'Spain', flag: '🇪🇸',
+    price: 490, mrp: 600, discount: 18, rating: 4.6, reviewCount: 112,
+    image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&h=300&fit=crop&auto=format',
+    description: "Spain's most decorated premium crisp brand. Kettle-cooked with seasoning crafted from real Osetra caviar extract and Maldon sea salt. A surprisingly refined snacking experience.",
+    ingredients: 'Potatoes, Olive Oil, Osetra Caviar Extract, Maldon Sea Salt, Natural Flavourings',
+    factsOrUsage: 'Net weight: 110g | Best served alongside sparkling wine.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_matcha_pocky', name: 'Ceremonial Matcha Pocky Box', brand: 'Glico Premium',
+    category: 'Snacks', subcategory: 'Sweets & Biscuits',
+    country: 'Japan', flag: '🇯🇵',
+    price: 620, mrp: 750, discount: 17, rating: 4.7, reviewCount: 94,
+    image: 'https://images.unsplash.com/photo-1515823064-d6e0c04616a7?w=400&h=300&fit=crop&auto=format',
+    description: "Limited reserve edition of Japan's most beloved biscuit stick. Made with first-flush ceremonial grade Uji matcha, providing an intensely green, slightly bitter, umami-forward coating.",
+    ingredients: 'Wheat Flour, White Chocolate, Uji Matcha (ceremonial grade), Sugar, Butter',
+    factsOrUsage: 'Box of 3 individual stick packs | Keep away from direct sunlight.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: false, colorHex: null,
+  },
+  // READY-TO-EAT
+  {
+    id: 'p_lobster_roll', name: 'Atlantic Lobster Roll Deluxe Kit', brand: 'Nova Scotia Blue',
+    category: 'Ready-to-Eat', subcategory: 'Gourmet Meals',
+    country: 'Canada', flag: '🇨🇦',
+    price: 1850, mrp: 2200, discount: 15, rating: 4.8, reviewCount: 29,
+    image: 'https://images.unsplash.com/photo-1559847260-76ea1574b4a6?w=400&h=300&fit=crop&auto=format',
+    description: 'Chilled Atlantic lobster claw and knuckle meat, already poached and seasoned with tarragon butter. Arrives with a toasted brioche split roll. Just warm, assemble, and serve.',
+    ingredients: 'Atlantic Lobster Meat, Cultured Butter, Tarragon, Sea Salt, Brioche Roll',
+    factsOrUsage: 'Serves 2 | Calories: 380 per serving | Ready in under 8 minutes.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: false, colorHex: null,
+  },
+  {
+    id: 'p_wagyu_sliders', name: 'A5 Kobe Wagyu Slidettes (2-Pack)', brand: 'Kobe Farms',
+    category: 'Ready-to-Eat', subcategory: 'Gourmet Meals',
+    country: 'Japan', flag: '🇯🇵',
+    price: 2900, mrp: 3500, discount: 17, rating: 4.9, reviewCount: 51,
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&auto=format',
+    description: 'BMS-12 rated A5 Kobe Wagyu beef patties, pre-seasoned with yuzu kosho and Himalayan salt. Pan-sear exactly 90 seconds each side for perfection. Comes with artisanal brioche buns and wasabi aioli.',
+    ingredients: 'A5 Wagyu Beef (BMS12), Yuzu Kosho, Himalayan Salt, Brioche Bun, Wasabi Aioli',
+    factsOrUsage: 'Pack of 2 sliders | Calories: 520 per slider | Keep refrigerated, consume within 48 hours.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: false, colorHex: null,
+  },
+  {
+    id: 'p_mac_truffle', name: 'Gruyère & Black Truffle Gnocchi', brand: 'Maison Lux Bistro',
+    category: 'Ready-to-Eat', subcategory: 'Gourmet Meals',
+    country: 'Italy', flag: '🇮🇹',
+    price: 1100, mrp: 1300, discount: 15, rating: 4.7, reviewCount: 44,
+    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop&auto=format',
+    description: 'Pillowy house-made potato gnocchi tossed in an aged Gruyère fondue laced with black Périgord truffle oil. Flash-frozen at source. Microwave-to-table in 4 minutes.',
+    ingredients: 'Potato, Gruyère AOP Cheese, Périgord Black Truffle Oil, Cream, Butter, Chives',
+    factsOrUsage: 'Serves 1 | Calories: 620 kcal | Microwave 3–4 minutes on high.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: false, colorHex: null,
+  },
+  // MAKEUP
+  {
+    id: 'p_lipstick_gold', name: 'Satin Champagne Gold Lipstick', brand: 'Aura Paris',
+    category: 'Makeup', subcategory: 'Lips',
+    country: 'France', flag: '🇫🇷',
+    price: 4800, mrp: 5500, discount: 12, rating: 4.8, reviewCount: 31,
+    image: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&h=300&fit=crop&auto=format',
+    description: "A metallic pearlescent nude-gold lipstick with a silky satin finish. Infused with Argan oil and Vitamin E for 10-hour moisture wear. Perfect for Bangalore's gala soirées.",
+    ingredients: 'Castor Oil, Argan Oil, Vitamin E, Mica (Gold Pigment), Silica, Candelilla Wax',
+    factsOrUsage: 'Shade: #D4AF37 Champagne Gold | Apply with included lip liner for longevity | Cruelty-free.',
+    isDietVegan: true, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: '#D4AF37',
+  },
+  {
+    id: 'p_lipstick_crimson', name: 'Rose Velvet Matte Lipstick', brand: 'Aura Paris',
+    category: 'Makeup', subcategory: 'Lips',
+    country: 'France', flag: '🇫🇷',
+    price: 4800, mrp: 5500, discount: 12, rating: 4.9, reviewCount: 68,
+    image: 'https://images.unsplash.com/photo-1512496522148-0d546512eabc?w=400&h=300&fit=crop&auto=format',
+    description: 'Intense deep crimson velvet matte. Transfer-resistant formula that delivers bold, unapologetic colour with zero feathering. A single swipe lasts 12 hours.',
+    ingredients: 'Castor Oil, Jojoba Ester, Vitamin E, CI 15850 (Red 7), Silica, Candelilla Wax',
+    factsOrUsage: 'Shade: #9C1C24 Deep Crimson | Full 12-hour wear | Cruelty-free, Fragrance-free.',
+    isDietVegan: true, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: '#9C1C24',
+  },
+  {
+    id: 'p_foundation_silk', name: 'Orchid Petal Serum Foundation', brand: 'Lumiere London',
+    category: 'Makeup', subcategory: 'Face',
+    country: 'United Kingdom', flag: '🇬🇧',
+    price: 6100, mrp: 7000, discount: 12, rating: 4.7, reviewCount: 57,
+    image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=400&h=300&fit=crop&auto=format',
+    description: 'A breathable serum-foundation hybrid that melts into skin like water. Infused with pink orchid stem cell extract for active treatment while delivering natural, skin-like radiance. SPF 30.',
+    ingredients: 'Pink Orchid Stem Cells, Hyaluronic Acid, Niacinamide, Zinc Oxide SPF30, Squalane',
+    factsOrUsage: 'Shade: Neutral Beige #F2C19E | Medium buildable coverage | Dermatologist-tested.',
+    isDietVegan: true, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: '#F2C19E',
+  },
+  // SKINCARE
+  {
+    id: 'p_serum_orchid', name: 'Andean Black Orchid Renewal Essence', brand: 'Orchidée Royale',
+    category: 'Skincare', subcategory: 'Serums & Elixirs',
+    country: 'Monaco', flag: '🇲🇨',
+    price: 18500, mrp: 22000, discount: 15, rating: 4.9, reviewCount: 26,
+    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&h=300&fit=crop&auto=format',
+    description: 'Monégasque luxury skin science at its zenith. Black orchid extract from the Andean highlands combined with 24K colloidal gold ions and retinol micro-spheres for overnight cellular regeneration.',
+    ingredients: 'Black Orchid Extract, Colloidal Gold, Retinol Micro-Spheres, Hyaluronic Acid, Peptide Complex',
+    factsOrUsage: '2 drops every night on clean skin. 30ml | Visible results in 14 days. Use SPF during the day.',
+    isDietVegan: true, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_eye_cream', name: 'Beluga Caviar Overnight Eye Therapy', brand: 'Marine Lux',
+    category: 'Skincare', subcategory: 'Eye Care',
+    country: 'Switzerland', flag: '🇨🇭',
+    price: 9400, mrp: 11000, discount: 14, rating: 4.8, reviewCount: 49,
+    image: 'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?w=400&h=300&fit=crop&auto=format',
+    description: 'Swiss biotech meets oceanic luxury. Beluga caviar extract delivers omega-3 fatty acids and amino acids directly to the delicate periorbital zone. Visibly reduces dark circles and puffiness by morning.',
+    ingredients: 'Beluga Caviar Extract, Caffeine, Hyaluronic Acid, Ceramide NP, Niacinamide, Peptide-6',
+    factsOrUsage: 'Dab gently with ring finger around orbital bone. 15ml. Use nightly for best results.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_saffron_oil', name: 'Kumkumadi & Kashmiri Saffron Glow Oil', brand: 'Ayur Lux',
+    category: 'Skincare', subcategory: 'Face Oils',
+    country: 'India', flag: '🇮🇳',
+    price: 3100, mrp: 3800, discount: 18, rating: 4.9, reviewCount: 74,
+    image: 'https://images.unsplash.com/photo-1629198688000-71f23e745b6e?w=400&h=300&fit=crop&auto=format',
+    description: 'A 5,000-year Ayurvedic formulation reinterpreted with modern cold-press techniques. Kumkumadi oil blended with ultra-premium Kashmiri Mongra saffron threads. Reduces pigmentation and imparts a royal golden glow.',
+    ingredients: 'Cold-pressed Sesame Oil, Kashmiri Mongra Saffron, Sandalwood, Lotus Petal Extract, Liquorice Root',
+    factsOrUsage: '3 drops warmed between palms, press into damp skin at night. 30ml. For all skin types.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  // HAIR CARE
+  {
+    id: 'p_hair_elixir', name: 'South African Marula Glass Hair Elixir', brand: 'Satin Crown',
+    category: 'Hair Care', subcategory: 'Hair Treatments',
+    country: 'South Africa', flag: '🇿🇦',
+    price: 4200, mrp: 5000, discount: 16, rating: 4.7, reviewCount: 63,
+    image: 'https://images.unsplash.com/photo-1522338242292-6244253e7543?w=400&h=300&fit=crop&auto=format',
+    description: 'Cold-pressed Marula oil from wild South African Sclerocarya birrea trees. An intensely lightweight, non-greasy oil that smooths frizz and imparts extraordinary mirror-like gloss to all hair types.',
+    ingredients: 'Marula Oil (Sclerocarya birrea), Argan Oil, Camellia Seed Oil, Vitamin E, Silk Amino Acids',
+    factsOrUsage: '2–3 drops on damp or dry hair. 50ml | Ideal for 2C–3A curl patterns. Heat protects up to 230°C.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_hair_mask', name: 'Caviar Bond Rehab Repair Mask', brand: 'Marine Lux',
+    category: 'Hair Care', subcategory: 'Deep Conditioning',
+    country: 'Switzerland', flag: '🇨🇭',
+    price: 5800, mrp: 6800, discount: 14, rating: 4.8, reviewCount: 59,
+    image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&h=300&fit=crop&auto=format',
+    description: 'Swiss marine science-formulated mask with Osetra caviar protein complex that molecularly bonds to damaged hair cortex strands. Delivers 3 weeks of frizz control in a single 15-minute application.',
+    ingredients: 'Osetra Caviar Protein, Keratin Bond Complex, Hyaluronic Acid, Argan Oil, Silk Proteins',
+    factsOrUsage: 'Apply to towel-dried hair. Leave 15 mins. Rinse. 200ml | For damaged, chemically-treated hair.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  // PREMIUM MEATS & SEAFOOD
+  {
+    id: 'p_wagyu_steak', name: 'A5 Kagoshima Wagyu Ribeye (200g)', brand: 'Japan Premium Beef',
+    category: 'Meats & Seafood', subcategory: 'Premium Beef',
+    country: 'Japan', flag: '🇯🇵',
+    price: 8500, mrp: 10000, discount: 15, rating: 4.9, reviewCount: 38,
+    image: 'https://images.unsplash.com/photo-1546833998-877b37c2e5c6?w=400&h=300&fit=crop&auto=format',
+    description: 'A single perfectly marbled A5 Kagoshima Wagyu ribeye, wet-aged 28 days for maximum flavour development. BMS-10 rating. The intramuscular fat melts at body temperature, delivering an unparalleled butter-rich mouthfeel.',
+    ingredients: '100% A5 Kagoshima Wagyu Beef, Himalayan Pink Salt (for curing)',
+    factsOrUsage: 'Serves 1–2 | Pat dry, sear in cast iron 90 sec/side, rest 5 min | Store at 0–2°C, use within 48 hours.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_iberico', name: 'Jamón Ibérico de Bellota (100g)', brand: 'Cinco Jotas',
+    category: 'Meats & Seafood', subcategory: 'Cured Charcuterie',
+    country: 'Spain', flag: '🇪🇸',
+    price: 3600, mrp: 4200, discount: 14, rating: 4.8, reviewCount: 44,
+    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=300&fit=crop&auto=format',
+    description: 'Hand-sliced from 100% pure Iberian black-footed pigs, acorn-fed for 3 years in the Huelva dehesa. 36-month air-cured. The gold standard of Spanish charcuterie — deep ruby, nutty, intensely savoury.',
+    ingredients: '100% Pure Iberian Pork Leg, Sea Salt',
+    factsOrUsage: 'Serve at room temperature | Pairs with Manchego + dry Fino sherry | 100g hand-sliced.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_bluefin', name: 'Bluefin Otoro Sashimi Grade (150g)', brand: 'Tsukiji Select',
+    category: 'Meats & Seafood', subcategory: 'Premium Seafood',
+    country: 'Japan', flag: '🇯🇵',
+    price: 6800, mrp: 8000, discount: 15, rating: 4.9, reviewCount: 27,
+    image: 'https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=400&h=300&fit=crop&auto=format',
+    description: 'The most prized cut of Pacific bluefin tuna — fatty otoro belly from the akami-side, sourced directly from Tsukiji-certified vessels. Flash-frozen at −60°C within hours of catch. Serve as sashimi with wasabi.',
+    ingredients: 'Pacific Bluefin Tuna (Thunnus orientalis) - Otoro grade',
+    factsOrUsage: 'Thaw in fridge 6 hours | Slice 5mm against grain | Serve with soy sauce and real wasabi.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_langoustine', name: 'Scottish Langoustine (500g Live)', brand: 'Loch Duart Reserve',
+    category: 'Meats & Seafood', subcategory: 'Premium Seafood',
+    country: 'United Kingdom', flag: '🇬🇧',
+    price: 4900, mrp: 5800, discount: 15, rating: 4.7, reviewCount: 31,
+    image: 'https://images.unsplash.com/photo-1559847260-76ea1574b4a6?w=400&h=300&fit=crop&auto=format',
+    description: 'Live Scottish langoustines delivered in oxygenated water pouches. Caught in Scottish West Coast lochs, these are the sweetest crustaceans in the world — instantly superior to any frozen alternative.',
+    ingredients: '100% Live Scottish Langoustine (Nephrops norvegicus)',
+    factsOrUsage: 'Steam or boil 3–4 min | Serve with herb butter | Best consumed same day.',
+    isDietVegan: false, isDietOrganic: true, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  // ARTISAN CHEESES
+  {
+    id: 'p_cheese_brie', name: 'Brie de Meaux AOP (250g)', brand: 'Fromagerie Dongé',
+    category: 'Artisan Cheeses', subcategory: 'Soft Cheeses',
+    country: 'France', flag: '🇫🇷',
+    price: 1800, mrp: 2100, discount: 14, rating: 4.8, reviewCount: 52,
+    image: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400&h=300&fit=crop&auto=format',
+    description: 'The "King of Cheeses." Authentic AOP-certified Brie de Meaux from the Seine-et-Marne region. Creamy, mushroomy and lactic — with a paper-thin white Penicillium crust. At perfect ripeness.',
+    ingredients: 'Unpasteurised Cow\'s Milk, Salt, Penicillium candidum, Rennet',
+    factsOrUsage: 'Serve at room temperature | Pairs with Champagne or light Pinot Noir | Consume within 5 days.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_cheese_parm', name: 'Parmigiano Reggiano 36-Month (200g)', brand: 'Cravero',
+    category: 'Artisan Cheeses', subcategory: 'Hard Cheeses',
+    country: 'Italy', flag: '🇮🇹',
+    price: 2200, mrp: 2600, discount: 15, rating: 4.9, reviewCount: 61,
+    image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=400&h=300&fit=crop&auto=format',
+    description: '36-month aged Parmigiano Reggiano selected personally by Cravero affineurs. Intensely crystalline and crumbly — with a profound umami, almond, and dried-fruit complexity that 24-month versions cannot match.',
+    ingredients: 'Raw Cow\'s Milk, Salt, Rennet — DOP Certified',
+    factsOrUsage: 'Break, never slice | Serve with aged balsamic and honey | Exceptional on risotto or pasta.',
+    isDietVegan: false, isDietOrganic: false, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  // FINE WINES & SPIRITS
+  {
+    id: 'p_champagne', name: 'Dom Pérignon Vintage 2015', brand: 'Moët Hennessy',
+    category: 'Fine Wines & Spirits', subcategory: 'Champagne',
+    country: 'France', flag: '🇫🇷',
+    price: 22000, mrp: 25000, discount: 12, rating: 5.0, reviewCount: 18,
+    image: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=400&h=300&fit=crop&auto=format',
+    description: 'The iconic prestige cuvée that has defined luxury Champagne since 1668. The 2015 vintage is a masterpiece of tension and energy — chalky minerality, toasted brioche, white peach, and electric acidity.',
+    ingredients: 'Chardonnay & Pinot Noir grapes, Champagne, France | 12.5% ABV | 750ml',
+    factsOrUsage: 'Serve at 8–10°C | Decant 20 minutes for full expression | Pairs with caviar and oysters.',
+    isDietVegan: true, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_whisky', name: 'Macallan 18 Year Sherry Oak', brand: 'The Macallan',
+    category: 'Fine Wines & Spirits', subcategory: 'Single Malt Whisky',
+    country: 'Scotland', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    price: 28500, mrp: 32000, discount: 10, rating: 4.9, reviewCount: 23,
+    image: 'https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=400&h=300&fit=crop&auto=format',
+    description: 'The gold standard of single malt Scotch whisky. 18 years matured exclusively in hand-picked Oloroso sherry-seasoned oak casks from Jerez, Spain. Rich dried fruit, chocolate orange, and warming ginger spice.',
+    ingredients: 'Single Malt Scotch Whisky, 18 Years, Speyside | 43% ABV | 700ml',
+    factsOrUsage: 'Serve neat or with a single large ice sphere | Nose before sipping | Gift box included.',
+    isDietVegan: true, isDietOrganic: false, isDietKeto: false, isDietGlutenFree: true, colorHex: null,
+  },
+  // LUXURY BEVERAGES
+  {
+    id: 'p_coffee', name: 'Gesha Village Anaerobic Natural (100g)', brand: 'Gesha Village Co.',
+    category: 'Luxury Beverages', subcategory: 'Specialty Coffee',
+    country: 'Ethiopia', flag: '🇪🇹',
+    price: 4800, mrp: 5600, discount: 14, rating: 4.9, reviewCount: 34,
+    image: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=400&h=300&fit=crop&auto=format',
+    description: 'Gesha Village Chaka lot — anaerobic natural processed. An extraordinary Ethiopian heirloom Gesha that defies convention. Perfume-like jasmine and rose florals, tropical mango, bergamot, and a champagne-like effervescence on the palate.',
+    ingredients: '100% Single-origin Ethiopia Gesha heirloom coffee, anaerobic natural process',
+    factsOrUsage: 'Grind fresh | Brew at 92°C | Best as pourover or AeroPress | Score: 93.5 SCA.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+  {
+    id: 'p_matcha', name: 'First Flush Uji Ceremonial Matcha (30g)', brand: 'Ippodo Tea',
+    category: 'Luxury Beverages', subcategory: 'Ceremonial Tea',
+    country: 'Japan', flag: '🇯🇵',
+    price: 3200, mrp: 3800, discount: 15, rating: 4.8, reviewCount: 47,
+    image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop&auto=format',
+    description: "Ippodo's finest ceremonial grade matcha, harvested from shade-grown Uji tencha in the first spring flush. Brilliant emerald green with an exceptionally smooth, almost creamy sweetness and zero bitterness.",
+    ingredients: '100% Ceremonial grade Uji Matcha (Camellia sinensis), stone-milled',
+    factsOrUsage: 'Sift 1.5g into warmed bowl | Add 70°C water | Whisk in W-motion with bamboo chasen.',
+    isDietVegan: true, isDietOrganic: true, isDietKeto: true, isDietGlutenFree: true, colorHex: null,
+  },
+];
+
+// ── CATEGORIES ────────────────────────────────────────────────────────────────
+const CATEGORIES = ['All', 'Groceries (Exotic)', 'Snacks', 'Ready-to-Eat', 'Meats & Seafood', 'Artisan Cheeses', 'Fine Wines & Spirits', 'Luxury Beverages', 'Makeup', 'Skincare', 'Hair Care'];
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const fmt = n => '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtInt = n => '₹' + Number(n).toLocaleString('en-IN');
+const fmtDate = ts => new Date(ts).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'2-digit'});
+const fmtTime = d => { const t = d instanceof Date ? d : new Date(d); return t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0'); };
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const getProduct = id => PRODUCTS.find(p => p.id === id);
+const cartCount = () => Object.values(appState.cart).reduce((a,b)=>a+b,0);
+const cartItems = () => Object.entries(appState.cart).filter(([,q])=>q>0).map(([id,qty])=>({...getProduct(id),qty}));
+function stars(rating, size=12) {
+  let s=''; for(let i=1;i<=5;i++){
+    const filled=i<=Math.floor(rating);
+    const half=!filled&&i-0.5<=rating;
+    s+=`<span style="font-size:${size}px;color:${filled||half?'var(--gold)':'var(--dark-border)'}">${filled?'★':half?'⯨':'★'}</span>`;
+  } return s;
+}
+function calcCart() {
+  const items = cartItems();
+  const subtotal = items.reduce((a,i)=>a+i.price*i.qty,0);
+  const totalMrp = items.reduce((a,i)=>a+i.mrp*i.qty,0);
+  const savings = totalMrp - subtotal;
+  const taxes = subtotal * 0.12;
+  const convFee = (subtotal + taxes) * 0.005;
+  const freeDelivery = subtotal > 1500 || ['Gold','Platinum'].includes(appState.profile.loyaltyTier);
+  const deliveryFee = freeDelivery ? 0 : 29;
+  let couponDiscount = 0;
+  if (appState.appliedCoupon) {
+    couponDiscount = getCouponDiscount(appState.appliedCoupon, subtotal) || 0;
+  }
+  const totalPayable = Math.max(0, subtotal + taxes + convFee + deliveryFee - couponDiscount);
+  return { subtotal, totalMrp, savings, taxes, convFee, deliveryFee, freeDelivery, couponDiscount, totalPayable };
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type='info', duration=2500) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(()=>{el.classList.add('hide'); setTimeout(()=>el.remove(), 350);}, duration);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function showModal(html, onClose) {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.innerHTML = `<div class="modal-sheet">${html}</div>`;
+  overlay.classList.add('active');
+  overlay.onclick = e => { if(e.target===overlay){ closeModal(); if(onClose)onClose(); } };
+}
+function closeModal() {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.remove('active');
+  overlay.innerHTML = '';
+}
+
+// ── ROUTER ────────────────────────────────────────────────────────────────────
+function navigateTo(screen, params={}) {
+  if(appState.trackingAnimFrame){ cancelAnimationFrame(appState.trackingAnimFrame); appState.trackingAnimFrame=null; }
+  appState.currentScreen = screen;
+  appState.navigationDetail = params.productId || null;
+  appState.navigationOrder = params.orderId || null;
+  renderApp();
+  const screenEl = document.getElementById('screen');
+  if(screenEl) screenEl.scrollTop = 0;
+}
+
+// ── RENDER APP ────────────────────────────────────────────────────────────────
+function renderApp() {
+  renderBottomNav();
+  const screen = appState.currentScreen;
+  const hideNav = ['detail','tracking','admin'].includes(screen);
+  const screenEl = document.getElementById('screen');
+  const navEl = document.getElementById('bottom-nav');
+  if(hideNav){ screenEl.style.bottom='0'; navEl.style.display='none'; }
+  else { screenEl.style.bottom='80px'; navEl.style.display='flex'; }
+  switch(screen) {
+    case 'home': screenEl.innerHTML = renderHome(); break;
+    case 'concierge': screenEl.innerHTML = renderConcierge(); attachConciergeEvents(); break;
+    case 'tryon': screenEl.innerHTML = renderARMirror(); initAR(); break;
+    case 'cart': screenEl.innerHTML = renderCart(); break;
+    case 'profile': screenEl.innerHTML = renderProfile(); break;
+    case 'detail': screenEl.innerHTML = renderDetail(appState.navigationDetail); break;
+    case 'tracking': screenEl.innerHTML = renderTracking(appState.navigationOrder); initTrackingCanvas(); break;
+    case 'admin': screenEl.innerHTML = renderAdmin(); break;
+    default: screenEl.innerHTML = renderHome();
+  }
+}
+
+function renderBottomNav() {
+  const tabs = [
+    {key:'home', label:'Discover', icon:'🧭'},
+    {key:'concierge', label:'Concierge', icon:'🛎'},
+    {key:'tryon', label:'AR Mirror', icon:'📷'},
+    {key:'cart', label:'Cart', icon:'🛍'},
+    {key:'profile', label:'Loyalty', icon:'🛡'},
+  ];
+  const count = cartCount();
+  document.getElementById('bottom-nav').innerHTML = tabs.map(t=>`
+    <div class="nav-tab ${appState.currentScreen===t.key?'active':''}" onclick="navigateTo('${t.key}')">
+      <span class="nav-icon">${t.icon}${t.key==='cart'&&count>0?`<span class="cart-badge">${count}</span>`:''}</span>
+      <span class="nav-label">${t.label}</span>
+    </div>`).join('');
+}
+// ── HOME SCREEN ───────────────────────────────────────────────────────────────
+function renderHome() {
+  const filtered = PRODUCTS.filter(p => {
+    if (appState.selectedCategory !== 'All' && p.category !== appState.selectedCategory) return false;
+    if (appState.searchQuery) {
+      const q = appState.searchQuery.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
+    }
+    if (appState.filterVegan && !p.isDietVegan) return false;
+    if (appState.filterOrganic && !p.isDietOrganic) return false;
+    if (appState.filterKeto && !p.isDietKeto) return false;
+    return true;
+  });
+
+  const pincodeColor = appState.isServiceable ? 'var(--success)' : 'var(--error)';
+  const pincodeText = appState.isServiceable
+    ? `📍 Delivering to Bangalore (${appState.checkedPincode})`
+    : `⚠️ Out of service area (${appState.checkedPincode})`;
+
+  return `
+    <div style="padding-bottom:16px">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--bronze),var(--gold));display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-weight:700;color:#000;font-size:15px;flex-shrink:0">ML</div>
+          <div>
+            <div style="font-family:var(--font-serif);font-size:20px;font-weight:700;line-height:1">Maison Lux</div>
+            <div style="font-size:10px;color:var(--gold);letter-spacing:1px">The world, delivered.</div>
+          </div>
+        </div>
+        <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="toggleTheme()">
+          ${appState.isDarkTheme ? '☀️ Light' : '🌙 Dark'}
+        </button>
+      </div>
+
+      <!-- Pincode Bar -->
+      <div style="padding:0 16px 8px">
+        <div class="pill-bar" onclick="showPincodeDialog()" style="border-color:${pincodeColor}30">
+          <span style="font-size:13px;color:${pincodeColor}">${pincodeText}</span>
+          <span style="margin-left:auto;color:var(--text-muted);font-size:11px">Change ›</span>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div style="padding:0 16px 10px;position:relative">
+        <span style="position:absolute;left:28px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none">🔍</span>
+        <input class="glass-input" style="padding-left:44px" placeholder="Search Japanese Mango, French Truffles, Serums..."
+          value="${esc(appState.searchQuery)}"
+          oninput="appState.searchQuery=this.value;document.getElementById('product-grid').innerHTML=renderProductGrid()">
+      </div>
+
+      <!-- Hero Banner -->
+      <div class="hero-banner" onclick="navigateTo('tryon')">
+        <div style="flex:1">
+          <div style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:6px">⚡ LIVE COSMETICS TRIAL</div>
+          <div style="font-family:var(--font-serif);font-size:17px;font-weight:600;line-height:1.3">Try Gold &amp; Crimson shades in real-time camera reflection.</div>
+        </div>
+        <div>
+          <button class="btn-gold" style="padding:10px 16px;font-size:12px;white-space:nowrap">AR Mirror</button>
+        </div>
+      </div>
+
+      <!-- Category Tabs -->
+      <div class="scroll-row" style="padding:10px 16px">
+        ${CATEGORIES.map(c=>`<div class="cat-tab ${appState.selectedCategory===c?'active':''}"
+          onclick="appState.selectedCategory='${c}';document.querySelectorAll('.cat-tab').forEach(el=>el.classList.remove('active'));this.classList.add('active');document.getElementById('product-grid').innerHTML=renderProductGrid()">${c}</div>`).join('')}
+      </div>
+
+      <!-- Diet Filters -->
+      <div style="display:flex;gap:8px;padding:0 16px 10px">
+        <div class="diet-chip ${appState.filterVegan?'active':''}" onclick="appState.filterVegan=!appState.filterVegan;this.classList.toggle('active');document.getElementById('product-grid').innerHTML=renderProductGrid()">🌱 Vegan</div>
+        <div class="diet-chip ${appState.filterOrganic?'active':''}" onclick="appState.filterOrganic=!appState.filterOrganic;this.classList.toggle('active');document.getElementById('product-grid').innerHTML=renderProductGrid()">🍊 Organic</div>
+        <div class="diet-chip ${appState.filterKeto?'active':''}" onclick="appState.filterKeto=!appState.filterKeto;this.classList.toggle('active');document.getElementById('product-grid').innerHTML=renderProductGrid()">🥑 Keto</div>
+      </div>
+
+      <!-- Product Grid -->
+      <div id="product-grid">${renderProductGrid()}</div>
+    </div>`;
+}
+
+function renderProductGrid() {
+  const filtered = PRODUCTS.filter(p => {
+    if (appState.selectedCategory !== 'All' && p.category !== appState.selectedCategory) return false;
+    if (appState.searchQuery) {
+      const q = appState.searchQuery.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
+    }
+    if (appState.filterVegan && !p.isDietVegan) return false;
+    if (appState.filterOrganic && !p.isDietOrganic) return false;
+    if (appState.filterKeto && !p.isDietKeto) return false;
+    return true;
+  });
+  if (!filtered.length) return `<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:12px">✦</div><div style="font-family:var(--font-serif);font-size:18px;color:var(--gold)">No luxury items found</div><div style="font-size:13px;margin-top:6px">Try adjusting your filters</div></div>`;
+  return `<div class="product-grid">${filtered.map((p,i)=>renderProductCard(p,i)).join('')}</div>`;
+}
+
+function renderProductCard(p, i=0) {
+  const qty = appState.cart[p.id] || 0;
+  return `
+    <div class="card product-card anim-card" style="animation-delay:${i*60}ms;cursor:pointer" onclick="navigateTo('detail',{productId:'${p.id}'})">
+      <div class="product-card-image">
+        ${p.image ? `<img src="${p.image}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none'">` : ''}
+        <div class="img-overlay"></div>
+        ${p.colorHex ? `<div style="position:relative;z-index:3;width:32px;height:32px;border-radius:50%;background:${p.colorHex};border:2px solid var(--gold)"></div>` : `<span style="position:relative;z-index:3;font-size:28px">${p.flag}</span>`}
+        <div class="country-chip">${p.country}</div>
+      </div>
+      <div class="product-card-body">
+        <div class="brand-label">${esc(p.brand)}</div>
+        <div class="product-name">${esc(p.name)}</div>
+        <div class="price-row">
+          <span class="price-gold">${fmtInt(p.price)}</span>
+          <div onclick="event.stopPropagation()">
+            ${qty > 0
+              ? `<div class="qty-stepper">
+                  <button onclick="updateCart('${p.id}',-1)">−</button>
+                  <span>${qty}</span>
+                  <button onclick="updateCart('${p.id}',1)">+</button>
+                </div>`
+              : `<button class="btn-gold add-btn" onclick="updateCart('${p.id}',1)">ADD</button>`
+            }
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── CONCIERGE SCREEN ──────────────────────────────────────────────────────────
+function renderConcierge() {
+  if (!appState.chatMessages.length) {
+    appState.chatMessages = [{
+      sender: 'AI',
+      content: `Greetings, ${appState.profile.name}. Welcome to Maison Lux. I am your bespoke AI Shopping Butler. Let me assist you in pairing premium beverages, selecting caviar facial masks, or arranging exotic ingredients. How may I serve you today?`,
+      timestamp: new Date()
+    }];
+  }
+  return `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <div class="screen-header">
+        <h1 style="font-family:var(--font-serif)">AI Concierge Butler</h1>
+        <button style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:13px;font-weight:600" onclick="appState.chatMessages=[];renderApp()">Clear</button>
+      </div>
+      <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;padding-bottom:80px">
+        ${appState.chatMessages.map(renderChatBubble).join('')}
+        ${appState.chatLoading ? `<div style="display:flex;gap:5px;padding:10px 14px;background:var(--frosted);border:1px solid var(--dark-border);border-radius:18px 18px 18px 4px;align-self:flex-start;width:60px">
+          <div class="typing-dot" style="animation-delay:0s"></div>
+          <div class="typing-dot" style="animation-delay:0.2s"></div>
+          <div class="typing-dot" style="animation-delay:0.4s"></div>
+        </div>` : ''}
+      </div>
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:var(--dark-bg);border-top:1px solid var(--dark-border);display:flex;gap:8px">
+        <input class="glass-input" id="chat-input" placeholder="Ask your butler anything..." style="flex:1" onkeydown="if(event.key==='Enter')sendChatMessage()">
+        <button class="btn-gold" style="padding:10px 14px;font-size:16px;flex-shrink:0" onclick="sendChatMessage()">▶</button>
+      </div>
+    </div>`;
+}
+
+function renderChatBubble(msg) {
+  const isUser = msg.sender === 'user';
+  const time = fmtTime(msg.timestamp);
+  const productRefs = [];
+  const content = msg.content.replace(/\b(p_[a-z_]+)\b/g, (match) => {
+    const prod = getProduct(match);
+    if (prod) { productRefs.push(prod); return `<strong>${prod.name}</strong>`; }
+    return match;
+  });
+  const productCards = productRefs.map(p => `
+    <div class="card" style="padding:10px;display:flex;align-items:center;gap:10px;margin-top:6px;cursor:pointer" onclick="navigateTo('detail',{productId:'${p.id}'})">
+      <span style="font-size:20px">${p.flag}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+        <div style="font-size:11px;color:var(--gold)">${fmtInt(p.price)}</div>
+      </div>
+      <span style="color:var(--gold);font-size:12px;font-weight:600;flex-shrink:0">View ›</span>
+    </div>`).join('');
+  return `
+    <div style="display:flex;flex-direction:column;align-items:${isUser?'flex-end':'flex-start'}">
+      <div class="${isUser?'chat-bubble-user':'chat-bubble-ai'}">${content}</div>
+      ${!isUser && productCards ? productCards : ''}
+      <div class="chat-time" style="text-align:${isUser?'right':'left'}">${time}</div>
+    </div>`;
+}
+
+function attachConciergeEvents() {
+  setTimeout(() => {
+    const msgs = document.getElementById('chat-messages');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  }, 50);
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  if (!input || !input.value.trim()) return;
+  const text = input.value.trim();
+  appState.chatMessages.push({ sender: 'user', content: text, timestamp: new Date() });
+  appState.chatLoading = true;
+  input.value = '';
+  renderApp();
+  askConcierge(text);
+}
+
+async function askConcierge(prompt) {
+  const lower = prompt.toLowerCase();
+  let response = '';
+  if (GEMINI_API_KEY !== 'MY_GEMINI_API_KEY') {
+    try {
+      const history = appState.chatMessages.slice(0, -1).map(m => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }]
+      }));
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: 'You are the premium personal shopping butler/concierge of Maison Lux, an ultra-luxury quick-commerce app in Bangalore delivering exotic groceries, gourmet snacks, ready-to-eat gourmet meals, premium meats, artisan cheeses, fine wines, luxury beverages, and haute cosmetics. Respond in an elegant, refined, helpful luxury style. Keep recommendations short, helpful, and sophisticated. Reference product IDs like p_truffle or p_wagyu_steak when recommending.' }] },
+          contents: [...history, { role: 'user', parts: [{ text: prompt }] }]
+        })
+      });
+      const data = await res.json();
+      response = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } catch(e) { response = ''; }
+  }
+  if (!response) {
+    if (/hello|hi|hey/.test(lower)) response = `Good day! I'm delighted to assist you here in Bangalore. Whether you seek a rare Miyazaki mango (p_mango), our finest Kobe Wagyu (p_wagyu_steak), or a bespoke skincare ritual, I am entirely at your service. What may I curate for you today?`;
+    else if (/truffle|alba/.test(lower)) response = `An excellent choice. Our Italian White Truffle from Alba (p_truffle) is among the rarest ingredients on earth. Hand-foraged in Piedmont, it commands ₹12,500 — and worth every rupee. Shall I add it to your curation?`;
+    else if (/wagyu|kobe|beef/.test(lower)) response = `For the discerning carnivore, I recommend our A5 Kagoshima Wagyu Ribeye (p_wagyu_steak) — a BMS-10 masterpiece, or the A5 Kobe Wagyu Slidettes (p_wagyu_sliders) for a more casual indulgence. Both are extraordinary.`;
+    else if (/pairing|wine|champagne/.test(lower)) response = `For a perfect evening, I suggest our Dom Pérignon Vintage 2015 (p_champagne) paired with the Italian White Truffle (p_truffle) or Beluga caviar. The 2015 vintage's chalky minerality is transcendent alongside umami-rich ingredients.`;
+    else if (/whisky|whiskey|scotch/.test(lower)) response = `The Macallan 18 Year Sherry Oak (p_whisky) is the crown jewel of our spirits collection. Rich dried fruit, chocolate orange, and warming ginger spice — best served neat with a single large ice sphere.`;
+    else if (/lipstick|lips/.test(lower)) response = `Two icons await you. The Satin Champagne Gold (p_lipstick_gold) for luminous golden evenings, and the Rose Velvet Matte (p_lipstick_crimson) for bold, unapologetic crimson drama. Visit our AR Mirror to trial both shades live.`;
+    else if (/skin|skincare|serum/.test(lower)) response = `For a complete luxury skin ritual, I recommend the Andean Black Orchid Renewal Essence (p_serum_orchid) — 24K gold + retinol micro-spheres — paired with the Beluga Caviar Eye Therapy (p_eye_cream) for overnight cellular regeneration.`;
+    else if (/cheese/.test(lower)) response = `Superb taste. Our Brie de Meaux AOP (p_cheese_brie) is at perfect ripeness today, and our 36-month Parmigiano Reggiano (p_cheese_parm) from Cravero is intensely crystalline. Shall I suggest a pairing platter?`;
+    else if (/mango|miyazaki|fruit/.test(lower)) response = `The Japanese Miyazaki Mango (p_mango) — "Egg of the Sun" — is perhaps the world's most perfect fruit. Sugar content guaranteed above 15%, completely fibreless. Presented in a ceremonial wooden box. ₹4,500 for an unforgettable experience.`;
+    else if (/coffee/.test(lower)) response = `Our Gesha Village Anaerobic Natural (p_coffee) scored 93.5 on the SCA scale — essentially a perfect coffee. Jasmine florals, mango, and bergamot notes that defy belief. It brews like liquid perfume.`;
+    else if (/matcha|tea/.test(lower)) response = `The Ippodo First Flush Uji Matcha (p_matcha) is ceremonial grade at its finest — brilliant emerald, creamy sweetness, zero bitterness. Our Ceremonial Matcha Pocky (p_matcha_pocky) offers a more playful expression of the same Uji terroir.`;
+    else response = `At Maison Lux, every product is curated from the world's finest artisans and producers. From rare Kashmiri saffron (p_saffron) to Tsukiji bluefin otoro (p_bluefin), we deliver Bangalore's most exclusive selection to your door within 45 minutes. How may I serve you?`;
+  }
+  appState.chatMessages.push({ sender: 'AI', content: response, timestamp: new Date() });
+  appState.chatLoading = false;
+  renderApp();
+}
+
+// ── AR MIRROR SCREEN ──────────────────────────────────────────────────────────
+function renderARMirror() {
+  const shadeProducts = PRODUCTS.filter(p => p.colorHex);
+  const selectedProd = shadeProducts.find(p => p.colorHex === appState.selectedLipstickHex) || shadeProducts[0];
+  return `
+    <div style="padding-bottom:20px">
+      <div class="screen-header">
+        <div class="back-btn" onclick="navigateTo('home')">‹</div>
+        <h1 style="font-family:var(--font-serif)">Maison Beauty AR Mirror</h1>
+      </div>
+      <div style="padding:0 16px">
+        <div id="ar-container" style="margin-bottom:16px">
+          <div style="position:relative;width:100%;max-width:280px;margin:0 auto">
+            <div id="ar-video-wrap" style="border-radius:50% / 45%;overflow:hidden;aspect-ratio:3/4;border:2px solid var(--gold);position:relative;animation:pulse-ring 2s infinite;background:#111">
+              <video id="ar-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;display:none"></video>
+              <canvas id="ar-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+              <div id="ar-fallback" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+                <span style="font-size:80px">👤</span>
+              </div>
+            </div>
+          </div>
+          <div id="ar-status" style="text-align:center;margin-top:10px;font-size:12px;color:var(--text-muted)">Initializing camera...</div>
+        </div>
+        <div style="margin-bottom:16px">
+          <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:10px">Select Shade</div>
+          <div class="scroll-row" style="padding:0;gap:16px">
+            ${shadeProducts.map(p=>`
+              <div style="display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer" onclick="selectShade('${p.colorHex}')">
+                <div class="shade-swatch ${appState.selectedLipstickHex===p.colorHex?'active':''}" style="background:${p.colorHex};width:42px;height:42px"></div>
+                <span style="font-size:9px;color:var(--text-muted);text-align:center;max-width:60px;line-height:1.2">${esc(p.name.split(' ').slice(0,2).join(' '))}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+        ${selectedProd ? `
+        <div class="card" style="padding:14px;display:flex;align-items:center;gap:12px">
+          <div style="width:44px;height:44px;border-radius:50%;background:${selectedProd.colorHex};border:2px solid var(--gold);flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px">${esc(selectedProd.brand)}</div>
+            <div style="font-family:var(--font-serif);font-size:14px;font-weight:600">${esc(selectedProd.name)}</div>
+            <div style="color:var(--gold);font-weight:700;font-size:14px">${fmtInt(selectedProd.price)}</div>
+          </div>
+          <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="updateCart('${selectedProd.id}',1);showToast('Added to cart','success')">Add to Cart</button>
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function selectShade(hex) {
+  appState.selectedLipstickHex = hex;
+  document.querySelectorAll('.shade-swatch').forEach(s => {
+    s.classList.toggle('active', s.parentElement.getAttribute('onclick') && s.parentElement.getAttribute('onclick').includes(hex));
+  });
+  renderApp();
+}
+
+let arStream = null;
+function initAR() {
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then(stream => {
+        arStream = stream;
+        const video = document.getElementById('ar-video');
+        const fallback = document.getElementById('ar-fallback');
+        const status = document.getElementById('ar-status');
+        if (!video) return;
+        video.srcObject = stream;
+        video.style.display = 'block';
+        if (fallback) fallback.style.display = 'none';
+        if (status) status.innerHTML = '<span style="color:var(--success)">🟢 Live AR Active</span>';
+        video.onloadedmetadata = () => drawAROverlay();
+      })
+      .catch(() => {
+        const status = document.getElementById('ar-status');
+        const fallback = document.getElementById('ar-fallback');
+        if (status) status.innerHTML = '<div style="color:var(--gold);font-weight:600">Live AR Mockup Active</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Camera not found — using real-time makeup simulator.</div>';
+        if (fallback) fallback.style.display = 'flex';
+        drawARFallback();
+      });
+  } else {
+    drawARFallback();
+  }
+}
+
+function drawAROverlay() {
+  const canvas = document.getElementById('ar-canvas');
+  const video = document.getElementById('ar-video');
+  if (!canvas || !video) return;
+  const ctx = canvas.getContext('2d');
+  function draw() {
+    if (!document.getElementById('ar-canvas')) return;
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2;
+    const cy = canvas.height * 0.68;
+    const rx = canvas.width * 0.18;
+    const ry = canvas.height * 0.07;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = hexToRgba(appState.selectedLipstickHex, 0.45);
+    ctx.fill();
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function drawARFallback() {
+  const canvas = document.getElementById('ar-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  function draw() {
+    if (!document.getElementById('ar-canvas')) return;
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2;
+    const cy = canvas.height * 0.68;
+    const rx = canvas.width * 0.22;
+    const ry = canvas.height * 0.08;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = hexToRgba(appState.selectedLipstickHex, 0.5);
+    ctx.fill();
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── CART SCREEN ───────────────────────────────────────────────────────────────
+function renderCart() {
+  const items = cartItems();
+  if (!items.length) return `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80%;padding:40px;text-align:center">
+      <div style="font-size:64px;margin-bottom:16px;opacity:0.4">🛍</div>
+      <div style="font-family:var(--font-serif);font-size:24px;color:var(--text-muted)">Bespoke Cart is Empty</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Add luxury products from the Discover tab to begin your curation.</div>
+      <button class="btn-gold" style="padding:12px 28px;margin-top:24px;font-size:14px" onclick="navigateTo('home')">Explore Collection</button>
+    </div>`;
+
+  const { subtotal, savings, taxes, convFee, deliveryFee, freeDelivery, couponDiscount, totalPayable } = calcCart();
+
+  return `
+    <div style="padding-bottom:100px">
+      <div class="screen-header"><h1 style="font-family:var(--font-serif)">Boutique Cart</h1></div>
+
+      <!-- Items -->
+      <div style="padding:0 16px">
+        <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:10px">Curation Items</div>
+        ${items.map(item=>`
+          <div class="card" style="padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer" onclick="navigateTo('detail',{productId:'${item.id}'})">
+            <span style="font-size:28px;flex-shrink:0">${item.flag}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:9px;font-weight:700;color:var(--gold);letter-spacing:1px">${esc(item.brand)}</div>
+              <div style="font-family:var(--font-serif);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.name)}</div>
+              <div style="font-size:12px;color:var(--gold);font-weight:600">${fmt(item.price)} each</div>
+            </div>
+            <div onclick="event.stopPropagation()">
+              <div class="qty-stepper">
+                <button onclick="updateCart('${item.id}',-1)">−</button>
+                <span>${item.qty}</span>
+                <button onclick="updateCart('${item.id}',1)">+</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Delivery Slots -->
+      <div style="padding:16px 16px 8px">
+        <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:10px">Delivery Slot</div>
+        <div style="display:flex;gap:10px">
+          ${['Express (10-45 mins)','Schedule Later'].map((slot,i)=>`
+            <div class="delivery-slot ${appState.selectedDeliverySlot===slot?'active':''}" onclick="appState.selectedDeliverySlot='${slot}';document.querySelectorAll('.delivery-slot').forEach(e=>e.classList.remove('active'));this.classList.add('active')">
+              <div style="font-size:20px">${i===0?'⚡':'🕐'}</div>
+              <div style="font-size:12px;font-weight:600;color:${appState.selectedDeliverySlot===slot?'var(--gold)':'var(--text-muted)'};margin-top:4px">${i===0?'Express':'Schedule'}</div>
+              <div style="font-size:10px;color:var(--text-muted)">${i===0?'10–45 mins':'Choose time'}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Coupon -->
+      <div style="padding:8px 16px">
+        <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:10px">Promo Code</div>
+        ${appState.appliedCoupon
+          ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(76,175,125,0.1);border:1px solid var(--success);border-radius:12px">
+              <span style="color:var(--success);font-size:13px;font-weight:600">✓ ${appState.appliedCoupon} applied — saving ${fmt(couponDiscount)}</span>
+              <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px" onclick="appState.appliedCoupon=null;appState.couponError=null;renderApp()">Remove</button>
+            </div>`
+          : `<div style="display:flex;gap:8px">
+              <input class="glass-input" id="coupon-input" placeholder="Enter promo code" style="flex:1" value="${esc(appState.adminCouponInput)}">
+              <button class="btn-gold" style="padding:10px 16px;font-size:13px" onclick="applyCoupon()">Apply</button>
+            </div>
+            ${appState.couponError ? `<div style="color:var(--error);font-size:12px;margin-top:6px">${appState.couponError}</div>` : ''}`}
+      </div>
+
+      <!-- Payment -->
+      <div style="padding:8px 16px">
+        <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:10px">Payment</div>
+        ${[
+          ['Wallet', `Lux Wallet (Bal: ${fmt(appState.profile.walletBalance)})`],
+          ['UPI', 'Razorpay Instant UPI'],
+          ['Card', 'Credit / Debit Cards'],
+          ['COD', 'Cash on Delivery']
+        ].map(([key,label])=>`
+          <div class="card payment-option ${appState.selectedPaymentMethod===key?'selected':''}" style="margin-bottom:8px" onclick="appState.selectedPaymentMethod='${key}';document.querySelectorAll('.payment-option').forEach(e=>{e.classList.remove('selected');e.querySelector('.radio-dot').style.background='';e.querySelector('.radio-dot').style.borderColor='var(--dark-border)'});this.classList.add('selected');this.querySelector('.radio-dot').style.background='var(--gold)';this.querySelector('.radio-dot').style.borderColor='var(--gold)'">
+            <div class="radio-dot" style="${appState.selectedPaymentMethod===key?'background:var(--gold);border-color:var(--gold)':''}"></div>
+            <div>
+              <div style="font-weight:600;font-size:13px;color:${appState.selectedPaymentMethod===key?'var(--gold)':'var(--text-primary)'}">${key}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${label}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Billing -->
+      <div style="padding:8px 16px">
+        <div class="card" style="padding:16px">
+          <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:12px">Bespoke Billing</div>
+          <div class="billing-row"><span>Curation Subtotal</span><span>${fmt(subtotal)}</span></div>
+          ${savings > 0 ? `<div class="billing-row"><span>Catalog Savings</span><span style="color:var(--success)">−${fmt(savings)}</span></div>` : ''}
+          <div class="billing-row"><span>Blended GST (12%)</span><span>${fmt(taxes)}</span></div>
+          <div class="billing-row"><span>Convenience Fee (0.5%)</span><span>${fmt(convFee)}</span></div>
+          <div class="billing-row"><span>Express Delivery</span><span style="${freeDelivery?'color:var(--gold)'}">${freeDelivery?'FREE':'₹29.00'}</span></div>
+          ${couponDiscount > 0 ? `<div class="billing-row"><span>Promo: ${appState.appliedCoupon}</span><span style="color:var(--success)">−${fmt(couponDiscount)}</span></div>` : ''}
+          <div class="billing-row" style="border-top:1px solid var(--dark-border);margin-top:8px;padding-top:12px">
+            <span style="font-weight:700;font-size:15px">Total Payable</span>
+            <span class="billing-total">${fmt(totalPayable)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Place Order Bar -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px 20px;background:rgba(13,13,13,0.95);backdrop-filter:blur(12px);border-top:1px solid var(--dark-border)">
+      <button class="btn-gold" style="width:100%;padding:16px;font-size:15px;font-family:var(--font-serif)" onclick="submitOrder()">
+        Place Express Order · ${fmt(totalPayable)}
+      </button>
+    </div>`;
+}
+
+function applyCoupon() {
+  const input = document.getElementById('coupon-input');
+  if (!input) return;
+  const code = input.value.trim().toUpperCase();
+  const { subtotal } = calcCart();
+  const discount = getCouponDiscount(code, subtotal);
+  if (discount !== null) {
+    appState.appliedCoupon = code;
+    appState.couponError = null;
+    showToast(`${code} applied!`, 'success');
+  } else {
+    appState.couponError = 'Invalid coupon code. Try WELCOME, AMEXGOLD or MLUXMAYANK.';
+    appState.appliedCoupon = null;
+  }
+  renderApp();
+}
+
+// ── SUBMIT ORDER ──────────────────────────────────────────────────────────────
+function submitOrder() {
+  const items = cartItems();
+  if (!items.length) return;
+  const { subtotal, taxes, convFee, deliveryFee, couponDiscount, totalPayable } = calcCart();
+  const orderId = 'ORD-' + Date.now();
+  const itemsSummary = items.map(i => `${i.name} × ${i.qty}`).join(', ');
+  const order = {
+    id: orderId,
+    timestamp: Date.now(),
+    itemsSummary,
+    subtotal, taxes, convFee, deliveryFee,
+    discountApplied: couponDiscount,
+    totalPayable,
+    status: 'Placed',
+    deliveryPin: appState.profile.pincode,
+    etaMinutes: 35,
+    addressName: appState.profile.savedAddress,
+    paymentMethod: appState.selectedPaymentMethod,
+    deliverySlot: appState.selectedDeliverySlot,
+  };
+  appState.orders.unshift(order);
+  const mult = { Silver: 1.0, Gold: 1.5, Platinum: 2.0 }[appState.profile.loyaltyTier] || 1;
+  const pts = Math.floor(totalPayable / 100) * mult;
+  appState.profile.loyaltyPoints = Math.round(appState.profile.loyaltyPoints + pts);
+  if (appState.profile.loyaltyPoints >= 3000) appState.profile.loyaltyTier = 'Platinum';
+  else if (appState.profile.loyaltyPoints >= 1000) appState.profile.loyaltyTier = 'Gold';
+  if (appState.selectedPaymentMethod === 'Wallet') {
+    appState.profile.walletBalance = Math.max(0, appState.profile.walletBalance - totalPayable);
+  }
+  appState.cart = {};
+  appState.appliedCoupon = null;
+  appState.couponError = null;
+  appState.activeOrderId = orderId;
+  const statuses = ['Confirmed','Packed','Out for Delivery','Delivered'];
+  const delays = [5000, 12000, 20000, 35000];
+  statuses.forEach((status, i) => {
+    setTimeout(() => {
+      const o = appState.orders.find(x => x.id === orderId);
+      if (o) { o.status = status; if (appState.currentScreen === 'tracking' && appState.navigationOrder === orderId) renderApp(); }
+    }, delays[i]);
+  });
+  showToast('Order placed! Track it live.', 'success');
+  navigateTo('tracking', { orderId });
+}
+
+// ── TRACKING SCREEN ───────────────────────────────────────────────────────────
+function renderTracking(orderId) {
+  const order = appState.orders.find(o => o.id === orderId);
+  if (!order) return `<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:40px">📦</div><div style="margin-top:12px">Order not found.</div></div>`;
+  const statusMap = { Placed:0, Confirmed:1, Packed:2, 'Out for Delivery':3, Delivered:4 };
+  const stepIndex = statusMap[order.status] || 0;
+  const steps = [
+    ['Order Placed', 'Your luxury curation has been confirmed.'],
+    ['Confirmed', 'Assigned to Maison concierge packer.'],
+    ['Packed & Sealed', 'Your order is sealed in premium black packaging.'],
+    ['Out for Delivery', 'Your rider is en route through Bangalore.'],
+    ['Delivered', 'Bespoke package delivered. Enjoy! 🎁'],
+  ];
+  const eta = stepIndex >= 4 ? 'Delivered' : `${Math.max(0, 25 - stepIndex * 5)} Mins`;
+
+  return `
+    <div style="padding-bottom:20px">
+      <div class="screen-header">
+        <div class="back-btn" onclick="navigateTo('home')">‹</div>
+        <h1 style="font-family:var(--font-serif)">Live Tracking</h1>
+      </div>
+      <div style="padding:0 16px">
+
+        <!-- Map Canvas -->
+        <div class="card" style="margin-bottom:16px;overflow:hidden">
+          <canvas id="tracking-canvas" style="width:100%;height:220px;display:block"></canvas>
+          <div style="padding:12px 14px">
+            <div style="font-family:var(--font-serif);font-size:18px;color:var(--gold)">Express ETA: ${eta}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Route: Maison Dark Store → ${order.deliveryPin}</div>
+          </div>
+        </div>
+
+        <!-- Stepper -->
+        <div class="card" style="padding:16px;margin-bottom:16px">
+          ${steps.map(([title,sub],i)=>{
+            const done = i < stepIndex;
+            const current = i === stepIndex;
+            const future = i > stepIndex;
+            return `
+              <div style="display:flex;gap:14px;position:relative;padding-bottom:${i<steps.length-1?'20px':'0'};background:${current?'rgba(212,175,55,0.05)':'transparent'};border-radius:10px;padding:8px;margin:-8px">
+                <div style="display:flex;flex-direction:column;align-items:center">
+                  <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;
+                    ${done?'background:var(--gold);color:#000':''}
+                    ${current?'border:2px solid var(--gold);animation:pulse-ring 1.5s infinite;color:var(--gold)':''}
+                    ${future?'border:2px solid var(--dark-border);color:var(--text-muted)':''}">
+                    ${done?'✓':i+1}
+                  </div>
+                  ${i<steps.length-1?`<div style="width:2px;flex:1;min-height:20px;background:${done?'var(--gold)':'var(--dark-border)'};margin-top:4px"></div>`:''}
+                </div>
+                <div style="padding-top:4px;padding-bottom:${i<steps.length-1?'20px':'0'}">
+                  <div style="font-weight:600;font-size:13px;color:${done||current?'var(--gold)':'var(--text-muted)'}">${title}</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${sub}</div>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+
+        <!-- Order Summary -->
+        <div class="card" style="padding:16px;margin-bottom:16px">
+          <div style="font-family:var(--font-serif);font-size:16px;margin-bottom:12px">Order Summary</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.8">
+            <div><span style="color:var(--text-primary);font-weight:600">Order ID:</span> ${order.id}</div>
+            <div><span style="color:var(--text-primary);font-weight:600">Total:</span> <span style="color:var(--gold)">${fmt(order.totalPayable)}</span></div>
+            <div><span style="color:var(--text-primary);font-weight:600">Items:</span> ${esc(order.itemsSummary)}</div>
+            <div><span style="color:var(--text-primary);font-weight:600">Address:</span> ${esc(order.addressName)}</div>
+            <div><span style="color:var(--text-primary);font-weight:600">Payment:</span> ${order.paymentMethod}</div>
+            <div><span style="color:var(--text-primary);font-weight:600">Slot:</span> ${order.deliverySlot}</div>
+          </div>
+        </div>
+
+        <!-- Driver Card -->
+        ${stepIndex >= 3 ? `
+        <div class="card" style="padding:16px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div class="driver-avatar">RK</div>
+            <div style="flex:1">
+              <div style="font-family:var(--font-serif);font-size:16px;font-weight:600">Rajesh Kumar</div>
+              <div style="font-size:11px;color:var(--text-muted)">Concierge Rider · ${order.status}</div>
+              <div style="font-size:13px;margin-top:2px">${'⭐'.repeat(5)} <span style="font-size:11px;color:var(--text-muted)">4.9</span></div>
+            </div>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showDriverChat()">📨 Message</button>
+          </div>
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function initTrackingCanvas() {
+  const canvas = document.getElementById('tracking-canvas');
+  if (!canvas) return;
+  const order = appState.orders.find(o => o.id === appState.navigationOrder);
+  if (!order) return;
+  const statusMap = { Placed:0, Confirmed:1, Packed:2, 'Out for Delivery':3, Delivered:4 };
+  const stepIndex = statusMap[order.status] || 0;
+  const t = stepIndex / 4;
+
+  function draw() {
+    if (!document.getElementById('tracking-canvas')) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = canvas.offsetHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    const p0 = {x: W*0.12, y: H*0.2};
+    const p1 = {x: W*0.4, y: H*0.15};
+    const p2 = {x: W*0.6, y: H*0.85};
+    const p3 = {x: W*0.88, y: H*0.8};
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.bezierCurveTo(p1.x,p1.y,p2.x,p2.y,p3.x,p3.y);
+    ctx.strokeStyle = 'rgba(192,160,96,0.25)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    if (t > 0) {
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      const steps = 60;
+      for (let s = 0; s <= steps * t; s++) {
+        const u = s / steps;
+        const bx = Math.pow(1-u,3)*p0.x + 3*Math.pow(1-u,2)*u*p1.x + 3*(1-u)*u*u*p2.x + u*u*u*p3.x;
+        const by = Math.pow(1-u,3)*p0.y + 3*Math.pow(1-u,2)*u*p1.y + 3*(1-u)*u*u*p2.y + u*u*u*p3.y;
+        ctx.lineTo(bx, by);
+      }
+      ctx.strokeStyle = 'var(--gold)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    const cx = Math.pow(1-t,3)*p0.x + 3*Math.pow(1-t,2)*t*p1.x + 3*(1-t)*t*t*p2.x + t*t*t*p3.x;
+    const cy2 = Math.pow(1-t,3)*p0.y + 3*Math.pow(1-t,2)*t*p1.y + 3*(1-t)*t*t*p2.y + t*t*t*p3.y;
+    const pulse = Math.sin(Date.now()/400) * 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy2, 10 + pulse, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(212,175,55,0.2)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy2, 7, 0, Math.PI*2);
+    ctx.fillStyle = 'var(--gold)';
+    ctx.fill();
+    ctx.font = '18px serif';
+    ctx.fillText('📦', p0.x-10, p0.y+6);
+    ctx.fillText('📍', p3.x-10, p3.y+6);
+    appState.trackingAnimFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function showDriverChat() {
+  let msgs = appState.driverMessages;
+  function renderDriverMsgs() {
+    return msgs.map(m => `
+      <div style="display:flex;flex-direction:column;align-items:${m.sender==='user'?'flex-end':'flex-start'};margin-bottom:10px">
+        <div class="${m.sender==='user'?'chat-bubble-user':'chat-bubble-ai'}">${esc(m.content)}</div>
+      </div>`).join('');
+  }
+  const html = `
+    <div style="font-family:var(--font-serif);font-size:18px;margin-bottom:16px">📨 Message Rider</div>
+    <div id="driver-chat-msgs" style="max-height:240px;overflow-y:auto;margin-bottom:12px">${renderDriverMsgs()}</div>
+    <div style="display:flex;gap:8px">
+      <input class="glass-input" id="driver-msg-input" placeholder="Type a message..." style="flex:1" onkeydown="if(event.key==='Enter')sendDriverMsg()">
+      <button class="btn-gold" style="padding:10px 14px" onclick="sendDriverMsg()">▶</button>
+    </div>`;
+  showModal(html);
+}
+
+function sendDriverMsg() {
+  const input = document.getElementById('driver-msg-input');
+  if (!input || !input.value.trim()) return;
+  appState.driverMessages.push({ sender: 'user', content: input.value.trim() });
+  input.value = '';
+  const replies = ["Got it!", "Sure, I'll call when nearby.", "Will be there shortly.", "Thank you, have a great day! 🙏"];
+  const reply = replies[Math.floor(Math.random() * replies.length)];
+  setTimeout(() => {
+    appState.driverMessages.push({ sender: 'driver', content: reply });
+    const msgsEl = document.getElementById('driver-chat-msgs');
+    if (msgsEl) { msgsEl.innerHTML = appState.driverMessages.map(m=>`
+      <div style="display:flex;flex-direction:column;align-items:${m.sender==='user'?'flex-end':'flex-start'};margin-bottom:10px">
+        <div class="${m.sender==='user'?'chat-bubble-user':'chat-bubble-ai'}">${esc(m.content)}</div>
+      </div>`).join(''); msgsEl.scrollTop = msgsEl.scrollHeight; }
+  }, 1500);
+  const msgsEl = document.getElementById('driver-chat-msgs');
+  if (msgsEl) { msgsEl.innerHTML = appState.driverMessages.map(m=>`
+    <div style="display:flex;flex-direction:column;align-items:${m.sender==='user'?'flex-end':'flex-start'};margin-bottom:10px">
+      <div class="${m.sender==='user'?'chat-bubble-user':'chat-bubble-ai'}">${esc(m.content)}</div>
+    </div>`).join(''); msgsEl.scrollTop = msgsEl.scrollHeight; }
+}
+
+// ── DETAIL SCREEN ─────────────────────────────────────────────────────────────
+function renderDetail(productId) {
+  const p = getProduct(productId);
+  if (!p) return `<div style="padding:40px;text-align:center;color:var(--text-muted)">Product not found.</div>`;
+  const inWishlist = appState.wishlist.has(p.id);
+  const qty = appState.cart[p.id] || 0;
+  const tab = appState.detailTab || 'description';
+  const similar = PRODUCTS.filter(x => x.category === p.category && x.id !== p.id).slice(0,4);
+  const dietBadges = [
+    p.isDietVegan && '🌱 Vegan',
+    p.isDietOrganic && '🍊 Organic',
+    p.isDietKeto && '🥑 Keto',
+    p.isDietGlutenFree && '🌾 Gluten-Free',
+  ].filter(Boolean);
+  const tabContent = {
+    description: `<p style="font-size:14px;line-height:1.7;color:var(--text-muted)">${esc(p.description)}</p>`,
+    ingredients: `<p style="font-size:14px;line-height:1.7;color:var(--text-muted)">${esc(p.ingredients)}</p>`,
+    facts: `<p style="font-size:14px;line-height:1.7;color:var(--text-muted)">${esc(p.factsOrUsage)}</p>`,
+  };
+
+  return `
+    <div style="padding-bottom:90px">
+      <div class="screen-header">
+        <div class="back-btn" onclick="navigateUp()">‹</div>
+        <h1 style="font-family:var(--font-serif);font-size:16px">${esc(p.brand)}</h1>
+        <button style="background:none;border:none;cursor:pointer;font-size:24px;color:${inWishlist?'var(--gold)':'var(--text-muted)'}" onclick="toggleWishlist('${p.id}')">
+          ${inWishlist ? '♥' : '♡'}
+        </button>
+      </div>
+
+      <!-- Visual -->
+      <div class="card" style="margin:0 16px 16px;height:220px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        ${p.image ? `<img src="${p.image}" alt="${esc(p.name)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+          <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.7))"></div>` : ''}
+        <div style="position:relative;z-index:1">
+          ${p.colorHex
+            ? `<div style="width:80px;height:80px;border-radius:50%;background:${p.colorHex};border:3px solid var(--gold);box-shadow:0 0 30px ${p.colorHex}55"></div>`
+            : `<span style="font-size:64px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5))">${p.flag}</span>`}
+        </div>
+        <div style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.7);color:#fff;font-size:11px;padding:4px 10px;border-radius:8px;z-index:1">${p.country}</div>
+        ${inWishlist ? `<div style="position:absolute;top:10px;right:10px;font-size:18px;z-index:1">✨</div>` : ''}
+      </div>
+
+      <!-- Info -->
+      <div style="padding:0 16px 16px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--gold)">${esc(p.brand)}</span>
+          <span style="color:var(--gold)">✅</span>
+          <span style="font-size:10px;color:var(--text-muted)">${p.flag} ${p.country}</span>
+        </div>
+        <div style="font-family:var(--font-serif);font-size:22px;font-weight:700;line-height:1.3;margin-bottom:10px">${esc(p.name)}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="color:var(--gold);font-weight:700;font-size:22px">${fmtInt(p.price)}</span>
+          <span style="color:var(--text-muted);text-decoration:line-through;font-size:14px">${fmtInt(p.mrp)}</span>
+          <span style="background:rgba(76,175,125,0.15);color:var(--success);padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700">${p.discount}% off</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+          ${stars(p.rating, 14)}
+          <span style="font-size:13px;font-weight:600">${p.rating}</span>
+          <span style="font-size:12px;color:var(--text-muted)">(${p.reviewCount} reviews)</span>
+        </div>
+        ${dietBadges.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${dietBadges.map(b=>`<span style="background:rgba(76,175,125,0.12);color:var(--success);padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600">${b}</span>`).join('')}</div>` : ''}
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:1px solid var(--dark-border);margin-bottom:14px">
+          ${[['description','Description'],['ingredients','Ingredients'],['facts','Facts / Usage']].map(([key,label])=>`
+            <div class="detail-tab ${tab===key?'active':''}" onclick="appState.detailTab='${key}';renderApp()">${label}</div>`).join('')}
+        </div>
+        <div>${tabContent[tab] || ''}</div>
+      </div>
+
+      <!-- Reviews -->
+      <div style="padding:0 16px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-family:var(--font-serif);font-size:18px">Elite Reviews (${p.reviewCount})</div>
+          <div style="font-size:13px;color:var(--gold)">★ ${p.rating} / 5.0</div>
+        </div>
+        <button class="card" style="display:flex;align-items:center;gap:8px;padding:10px 14px;width:100%;border:none;cursor:pointer;color:var(--text-muted);margin-bottom:12px;background:var(--frosted)" onclick="showToast('Review upload feature coming soon!','info')">
+          📷 <span style="font-size:13px">Upload Review Photo</span>
+        </button>
+        ${[
+          [5,'Absolute perfection.','@elara_lux','Maison Lux never disappoints. Delivered in immaculate condition.'],
+          [5,'Worth every rupee.','@nirvaan_b','Delivered in perfect condition. The packaging alone is art.'],
+          [4,'Luxurious experience.','@priya.k','Beautifully packaged. Will order again without hesitation.'],
+        ].map(([r,title,user,body])=>`
+          <div class="review-card card" style="margin-bottom:10px;padding:14px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div>${stars(r,12)}</div>
+              <span style="font-size:13px;font-weight:600">"${title}"</span>
+            </div>
+            <div style="font-size:12px;color:var(--gold);margin-bottom:4px">${user}</div>
+            <div style="font-size:12px;color:var(--text-muted)">${body}</div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Similar Products -->
+      ${similar.length ? `
+      <div style="padding:0 0 16px">
+        <div class="section-title" style="padding:0 16px 10px">Similar Products</div>
+        <div class="scroll-row">
+          ${similar.map(s=>`
+            <div class="card" style="min-width:120px;cursor:pointer;flex-shrink:0" onclick="appState.navigationDetail='${s.id}';appState.detailTab='description';renderApp()">
+              <div style="height:70px;background:linear-gradient(135deg,#1a1a1a,#111);display:flex;align-items:center;justify-content:center;font-size:26px;position:relative">
+                ${s.image ? `<img src="${s.image}" alt="${esc(s.name)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:14px 14px 0 0">
+                <div style="position:absolute;inset:0;background:rgba(0,0,0,0.3);border-radius:14px 14px 0 0"></div>
+                <span style="position:relative;z-index:1">${s.flag}</span>` : s.flag}
+              </div>
+              <div style="padding:8px">
+                <div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-serif)">${esc(s.name)}</div>
+                <div style="color:var(--gold);font-size:11px;font-weight:600;margin-top:2px">${fmtInt(s.price)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>
+
+    <!-- Sticky Bottom Bar -->
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px 20px;background:rgba(13,13,13,0.95);backdrop-filter:blur(12px);border-top:1px solid var(--dark-border)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="qty-stepper" style="background:var(--frosted);border:1px solid var(--dark-border)">
+          <button style="color:var(--gold)" onclick="updateCart('${p.id}',-1)">−</button>
+          <span style="color:var(--text-primary)">${qty}</span>
+          <button style="color:var(--gold)" onclick="updateCart('${p.id}',1)">+</button>
+        </div>
+        <button class="btn-gold" style="flex:1;padding:13px;font-size:14px;font-family:var(--font-serif)" onclick="updateCart('${p.id}',1);showToast('Added to cart','success')">
+          Add to Cart
+        </button>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:6px">TOTAL COST ${fmt(p.price * (qty||1))}</div>
+    </div>`;
+}
+
+// ── PROFILE SCREEN ────────────────────────────────────────────────────────────
+function renderProfile() {
+  const pr = appState.profile;
+  const tierStars = { Silver:1, Gold:2, Platinum:3 }[pr.loyaltyTier] || 1;
+  const nextTier = pr.loyaltyTier === 'Platinum' ? null : pr.loyaltyTier === 'Gold' ? 3000 : 1000;
+  const progress = nextTier ? Math.min(100, (pr.loyaltyPoints / nextTier) * 100) : 100;
+  const mult = { Silver:'1.0×', Gold:'1.5×', Platinum:'2.0×' }[pr.loyaltyTier] || '1.0×';
+  const initials = pr.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+  const boxes = [
+    { id:'gourmet', title:'Gourmet Explorer Box', desc:'Monthly curated exotic groceries & snacks from 5 countries' },
+    { id:'beauty', title:'Beauty Atelier Box', desc:'Bi-monthly luxury skincare & makeup discovery set' },
+    { id:'prestige', title:'Prestige Annual Chest', desc:'Quarterly mega-box with full-size rare exclusives' },
+  ];
+
+  return `
+    <div style="padding-bottom:20px">
+      <div class="screen-header"><h1 style="font-family:var(--font-serif)">Loyalty Circle</h1></div>
+
+      <!-- Profile Header -->
+      <div class="card" style="margin:0 16px 16px;padding:20px;display:flex;align-items:center;gap:16px">
+        <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--bronze),var(--gold));display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:22px;font-weight:700;color:#000;flex-shrink:0">${initials}</div>
+        <div>
+          <div style="font-family:var(--font-serif);font-size:20px;font-weight:700">${esc(pr.name)}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${esc(pr.email)}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${esc(pr.phone)}</div>
+        </div>
+      </div>
+
+      <!-- Loyalty Tier Card -->
+      <div class="tier-card" style="margin:0 16px 16px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div>
+            <div style="font-family:var(--font-serif);font-size:32px;font-weight:700;color:var(--gold);letter-spacing:2px">${pr.loyaltyTier.toUpperCase()}</div>
+            <div style="color:var(--gold);font-size:18px;margin-bottom:12px">${'★'.repeat(tierStars)}${'☆'.repeat(3-tierStars)}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <div style="font-size:9px;letter-spacing:1px;color:var(--text-muted)">LUXURY WALLET</div>
+                <div style="font-family:var(--font-serif);font-size:18px;color:var(--gold)">${fmt(pr.walletBalance)}</div>
+              </div>
+              <div>
+                <div style="font-size:9px;letter-spacing:1px;color:var(--text-muted)">LOYALTY POINTS</div>
+                <div style="font-family:var(--font-serif);font-size:18px;color:var(--gold)">${pr.loyaltyPoints} PTS</div>
+              </div>
+              <div>
+                <div style="font-size:9px;letter-spacing:1px;color:var(--text-muted)">MULTIPLIER</div>
+                <div style="font-family:var(--font-serif);font-size:18px;color:var(--gold)">${mult}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        ${nextTier ? `
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:6px">
+            <span>${pr.loyaltyTier} → ${pr.loyaltyTier==='Silver'?'Gold':'Platinum'}</span>
+            <span>${pr.loyaltyPoints} / ${nextTier} pts</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
+        </div>` : `<div style="margin-top:12px;font-size:12px;color:var(--gold)">✦ Platinum Elite — Maximum Privileges Unlocked</div>`}
+      </div>
+
+      <!-- Lux Box Subscriptions -->
+      <div style="padding:0 16px 16px">
+        <div class="section-title" style="padding:0 0 10px">Lux Box Subscriptions</div>
+        ${boxes.map(b=>`
+          <div class="card" style="padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+            <div style="flex:1">
+              <div style="font-family:var(--font-serif);font-size:15px;font-weight:600;margin-bottom:4px">${b.title}</div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.4">${b.desc}</div>
+            </div>
+            ${pr.subscribedBoxType === b.id
+              ? `<button style="background:rgba(76,175,125,0.15);color:var(--success);border:1px solid var(--success);border-radius:20px;padding:8px 12px;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap" onclick="unsubscribeBox()">✓ Subscribed</button>`
+              : `<button class="btn-gold" style="padding:8px 14px;font-size:11px;white-space:nowrap" onclick="subscribeBox('${b.id}','${esc(b.title)}')">Subscribe</button>`}
+          </div>`).join('')}
+      </div>
+
+      <!-- Referral -->
+      <div class="card" style="margin:0 16px 16px;padding:18px">
+        <div style="font-family:var(--font-serif);font-size:16px;margin-bottom:12px">Referral Code</div>
+        <div style="font-family:monospace;font-size:20px;font-weight:700;color:var(--gold);letter-spacing:3px;background:var(--dark-bg);border:1px solid var(--dark-border);border-radius:10px;padding:12px 16px;text-align:center;margin-bottom:12px">${pr.referralCode}</div>
+        <button class="btn-gold" style="width:100%;padding:12px;font-size:13px" onclick="shareReferral()">Share Referral Code</button>
+      </div>
+
+      <!-- Order History -->
+      <div style="padding:0 16px 16px">
+        <div class="section-title" style="padding:0 0 10px">Recent Orders</div>
+        ${appState.orders.length === 0
+          ? `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">No orders yet. Start your first luxury curation.</div>`
+          : appState.orders.map(o=>{
+            const badge = { Placed:'badge-placed', Confirmed:'badge-confirmed', Packed:'badge-packed', 'Out for Delivery':'badge-out', Delivered:'badge-delivered' }[o.status] || 'badge-placed';
+            return `<div class="card" style="padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="navigateTo('tracking',{orderId:'${o.id}'})">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary)">${o.id.slice(0,18)}...</div>
+                <div style="font-size:11px;color:var(--text-muted)">${fmtDate(o.timestamp)}</div>
+              </div>
+              <span class="order-status-badge ${badge}">${o.status}</span>
+              <span style="color:var(--gold);font-weight:700;font-size:13px;white-space:nowrap">${fmt(o.totalPayable)}</span>
+            </div>`;}).join('')}
+      </div>
+
+      <!-- Settings -->
+      <div class="card" style="margin:0 16px 16px;padding:16px">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">📍 ${esc(pr.savedAddress)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--dark-border)">
+          <span style="font-size:13px">Theme</span>
+          <button class="btn-gold" style="padding:7px 16px;font-size:12px" onclick="toggleTheme()">${appState.isDarkTheme?'☀️ Light Mode':'🌙 Dark Mode'}</button>
+        </div>
+      </div>
+      <div style="text-align:center;padding:8px 0 4px">
+        <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px" onclick="navigateTo('admin')">⚙️ Admin Panel →</button>
+      </div>
+    </div>`;
+}
+
+function subscribeBox(id, title) {
+  appState.profile.isSubscribedLuxBox = true;
+  appState.profile.subscribedBoxType = id;
+  showToast(`Subscribed to ${title}!`, 'success');
+  renderApp();
+}
+function unsubscribeBox() {
+  appState.profile.isSubscribedLuxBox = false;
+  appState.profile.subscribedBoxType = null;
+  showToast('Unsubscribed from Lux Box.', 'info');
+  renderApp();
+}
+function shareReferral() {
+  const code = appState.profile.referralCode;
+  if (navigator.share) {
+    navigator.share({ title: 'Maison Lux', text: `Use my referral code ${code} on Maison Lux for exclusive benefits.`, url: window.location.href });
+  } else {
+    navigator.clipboard?.writeText(code).then(() => showToast('Referral code copied!', 'success')).catch(() => showToast('Code: ' + code, 'info'));
+  }
+}
+
+// ── ADMIN SCREEN ──────────────────────────────────────────────────────────────
+function renderAdmin() {
+  return `
+    <div style="padding-bottom:20px">
+      <div class="screen-header">
+        <div class="back-btn" onclick="navigateTo('profile')">‹</div>
+        <div>
+          <h1 style="font-size:17px">⚙️ Admin Debug Panel</h1>
+          <div style="font-size:10px;color:var(--text-muted)">Developer testing tools for Maison Lux</div>
+        </div>
+      </div>
+      <div style="padding:0 16px">
+
+        <!-- Wallet Injector -->
+        <div class="card" style="padding:16px;margin-bottom:14px">
+          <div style="font-family:var(--font-serif);font-size:17px;margin-bottom:4px">💰 Wallet Credit Injector</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Add mock credits to user's luxury wallet for offline checkout testing.</div>
+          <div style="display:flex;gap:8px">
+            <input class="glass-input" id="wallet-amount" type="number" value="${appState.adminWalletInput}" style="flex:1">
+            <button class="btn-gold" style="padding:10px 16px" onclick="injectWallet()">Inject</button>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Current balance: <span style="color:var(--gold)">${fmt(appState.profile.walletBalance)}</span></div>
+        </div>
+
+        <!-- Coupon Registry -->
+        <div class="card" style="padding:16px;margin-bottom:14px">
+          <div style="font-family:var(--font-serif);font-size:17px;margin-bottom:4px">🎟 Coupon Registry</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Register custom promotional coupon codes (₹100 flat discount).</div>
+          <div style="display:flex;gap:8px">
+            <input class="glass-input" id="coupon-code-input" placeholder="e.g. ULTRA99" style="flex:1">
+            <button class="btn-gold" style="padding:10px 16px" onclick="registerCoupon()">Register</button>
+          </div>
+          ${appState.customCoupons.length ? `
+          <div style="margin-top:12px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Registered codes:</div>
+            ${appState.customCoupons.map(c=>`<span style="display:inline-block;background:rgba(212,175,55,0.1);border:1px solid var(--dark-border);border-radius:8px;padding:3px 10px;font-size:11px;color:var(--gold);margin:3px">${c}</span>`).join('')}
+          </div>` : ''}
+        </div>
+
+        <!-- Reseed -->
+        <div class="card" style="padding:16px;margin-bottom:14px">
+          <div style="font-family:var(--font-serif);font-size:17px;margin-bottom:4px">🌐 Product Database Reseed</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Force-reload all ${PRODUCTS.length} luxury SKUs into the product catalog.</div>
+          <button class="btn-gold" style="width:100%;padding:12px;font-size:13px" onclick="document.getElementById('reseed-msg').style.display='block'">🌐 Force Reseed Products</button>
+          <div id="reseed-msg" style="display:none;margin-top:10px;padding:10px;background:rgba(76,175,125,0.1);border:1px solid var(--success);border-radius:10px;color:var(--success);font-size:12px;text-align:center">
+            ✓ Luxury product database populated with ${PRODUCTS.length} detailed SKUs!
+          </div>
+        </div>
+
+        <!-- Quick State -->
+        <div class="card" style="padding:16px">
+          <div style="font-family:var(--font-serif);font-size:17px;margin-bottom:8px">📊 App State</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.8">
+            <div>Cart items: <span style="color:var(--gold)">${cartCount()}</span></div>
+            <div>Orders placed: <span style="color:var(--gold)">${appState.orders.length}</span></div>
+            <div>Wishlist items: <span style="color:var(--gold)">${appState.wishlist.size}</span></div>
+            <div>Loyalty: <span style="color:var(--gold)">${appState.profile.loyaltyTier} · ${appState.profile.loyaltyPoints} pts</span></div>
+            <div>Theme: <span style="color:var(--gold)">${appState.isDarkTheme?'Dark':'Light'}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function injectWallet() {
+  const input = document.getElementById('wallet-amount');
+  const amount = parseFloat(input?.value || appState.adminWalletInput);
+  if (isNaN(amount) || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+  appState.profile.walletBalance += amount;
+  showToast(`${fmt(amount)} injected to Lux Wallet`, 'success');
+  renderApp();
+}
+function registerCoupon() {
+  const input = document.getElementById('coupon-code-input');
+  const code = input?.value.trim().toUpperCase();
+  if (!code || code.length < 3) { showToast('Enter a valid coupon code', 'error'); return; }
+  if (appState.customCoupons.includes(code)) { showToast('Code already registered', 'info'); return; }
+  appState.customCoupons.push(code);
+  showToast(`${code} registered! (₹100 flat off)`, 'success');
+  renderApp();
+}
+
+// ── MISC ACTIONS ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  appState.isDarkTheme = !appState.isDarkTheme;
+  document.documentElement.setAttribute('data-theme', appState.isDarkTheme ? 'dark' : 'light');
+  renderApp();
+}
+
+function toggleWishlist(id) {
+  if (appState.wishlist.has(id)) { appState.wishlist.delete(id); showToast('Removed from wishlist', 'info'); }
+  else { appState.wishlist.add(id); showToast('Added to wishlist ♥', 'success'); }
+  renderApp();
+}
+
+function updateCart(id, delta) {
+  const current = appState.cart[id] || 0;
+  const next = Math.max(0, current + delta);
+  if (next === 0) delete appState.cart[id]; else appState.cart[id] = next;
+  if (delta > 0 && current === 0) showToast('Added to cart', 'success');
+  renderApp();
+}
+
+function navigateUp() {
+  navigateTo('home');
+}
+
+function showPincodeDialog() {
+  const html = `
+    <div style="font-family:var(--font-serif);font-size:20px;font-weight:700;margin-bottom:8px">Check Serviceability</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Maison Lux currently delivers exclusively to Bangalore (560xxx pincodes). Enter your 6-digit pincode to confirm coverage.</div>
+    <input class="glass-input" id="pincode-input" type="text" inputmode="numeric" maxlength="6" placeholder="Enter 6-digit pincode" value="${appState.checkedPincode}" style="margin-bottom:8px">
+    <div id="pincode-error" style="color:var(--error);font-size:12px;margin-bottom:12px;display:none"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-gold" style="flex:1;padding:12px" onclick="applyPincode()">Apply Code</button>
+      <button style="flex:1;padding:12px;background:none;border:1px solid var(--dark-border);border-radius:24px;color:var(--text-muted);cursor:pointer" onclick="closeModal()">Back</button>
+    </div>`;
+  showModal(html);
+}
+
+function applyPincode() {
+  const input = document.getElementById('pincode-input');
+  const errEl = document.getElementById('pincode-error');
+  const val = input?.value.trim();
+  if (!val || !/^\d{6}$/.test(val)) {
+    if (errEl) { errEl.style.display='block'; errEl.textContent='Please enter a valid 6-digit pincode.'; } return;
+  }
+  appState.checkedPincode = val;
+  appState.isServiceable = val.startsWith('560');
+  closeModal();
+  renderApp();
+  showToast(appState.isServiceable ? 'Delivering to ' + val : 'Sorry, ' + val + ' is outside our service area', appState.isServiceable ? 'success' : 'error');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.setAttribute('data-theme', 'dark');
+  renderApp();
+});
+</script>
+</body>
+</html>
