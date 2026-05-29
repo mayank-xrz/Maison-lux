@@ -1,0 +1,935 @@
+
+:root {
+  --gold: #D4AF37;
+  --bronze: #C07020;
+  --dark-bg: #0D0D0D;
+  --dark-elevated: #1A1A1A;
+  --dark-card: #1E1E1E;
+  --dark-border: rgba(212,175,55,0.15);
+  --text-primary: #F0EDE8;
+  --text-muted: #888880;
+  --text-gold: #D4AF37;
+  --success: #4CAF7D;
+  --error: #E05252;
+  --frosted: rgba(255,255,255,0.04);
+  --frosted-border: rgba(212,175,55,0.12);
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+}
+[data-theme="light"] {
+  --dark-bg: #F5F0E8;
+  --dark-elevated: #EDE8DE;
+  --dark-card: #F8F5F0;
+  --text-primary: #1A1A1A;
+  --text-muted: #666660;
+  --frosted: rgba(0,0,0,0.03);
+  --frosted-border: rgba(180,140,20,0.18);
+  --dark-border: rgba(180,140,20,0.18);
+}
+
+/* ── Reset ── */
+*{box-sizing:border-box;margin:0;padding:0}
+
+body {
+  background: var(--dark-bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+@media (min-width: 420px) {
+  body {
+    background: #000;
+  }
+  #app-wrapper {
+    border-radius: 32px;
+    box-shadow: 0 0 80px rgba(0,0,0,0.8);
+  }
+}
+
+/* ── App Frame ── */
+#app-wrapper {
+  max-width: 420px;
+  margin: auto;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 80px rgba(0,0,0,0.8);
+  border-radius: 32px;
+}
+
+/* ── Screen ── */
+#screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 80px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#screen.no-bottom-nav {
+  bottom: 0;
+}
+
+/* ── Bottom Nav ── */
+#bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: rgba(13,13,13,0.92);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--dark-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 12px 16px;
+}
+
+.nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 12px;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.nav-tab.active .nav-icon {
+  color: var(--gold);
+}
+
+.nav-tab.active .nav-label {
+  color: var(--gold);
+}
+
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  width: 20px;
+  height: 2px;
+  background: var(--gold);
+  border-radius: 1px;
+}
+
+.nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.nav-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ── Cart Badge ── */
+.cart-badge {
+  position: absolute;
+  top: 4px;
+  right: 50%;
+  transform: translateX(100%);
+  background: var(--gold);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  animation: badge-bounce 0.3s ease;
+}
+
+@keyframes badge-bounce {
+  0%,100%{transform:translateX(100%) scale(1)}
+  50%{transform:translateX(100%) scale(1.3)}
+}
+
+/* ── Card Base ── */
+.card {
+  background: var(--frosted);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--frosted-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* ── Gold Button ── */
+.btn-gold {
+  background: var(--gold);
+  color: #000;
+  font-weight: 700;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: transform 0.15s;
+}
+
+.btn-gold:active {
+  transform: scale(0.97);
+}
+
+/* ── Screen Header ── */
+.screen-header {
+  padding: 16px 16px 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--dark-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.screen-header h1 {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  flex: 1;
+}
+
+.back-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: var(--frosted);
+  border: 1px solid var(--dark-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* ── Product Card ── */
+.product-card {
+  background: var(--frosted);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--frosted-border);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  animation: slide-up 0.4s ease both;
+}
+
+.product-card-image {
+  height: 115px;
+  background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.product-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+
+.product-card-image .img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.6));
+  z-index: 1;
+}
+
+.country-chip {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  z-index: 2;
+}
+
+.product-card-body {
+  padding: 10px;
+}
+
+.brand-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.product-name {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 3px 0;
+}
+
+.price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.price-gold {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ── Qty Stepper ── */
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--gold);
+  border-radius: 16px;
+  padding: 3px 6px;
+}
+
+.qty-stepper button {
+  background: none;
+  border: none;
+  color: #000;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.qty-stepper span {
+  color: #000;
+  font-weight: 700;
+  font-size: 12px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.add-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+}
+
+/* ── Toast ── */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: toast-in 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.toast.success {
+  background: var(--success);
+  color: #fff;
+}
+
+.toast.error {
+  background: var(--error);
+  color: #fff;
+}
+
+.toast.info {
+  background: var(--gold);
+  color: #000;
+}
+
+@keyframes toast-in {
+  from{opacity:0;transform:translateY(-10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.toast.hide {
+  animation: toast-out 0.3s ease forwards;
+}
+
+@keyframes toast-out {
+  to{opacity:0;transform:translateY(-10px)}
+}
+
+/* ── Glass Input ── */
+.glass-input {
+  background: var(--frosted);
+  border: 1px solid var(--dark-border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  padding: 10px 14px;
+  width: 100%;
+  outline: none;
+  font-size: 14px;
+}
+
+.glass-input:focus {
+  border-color: var(--gold);
+}
+
+/* ── Modal ── */
+#modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+#modal-overlay.active {
+  display: flex;
+}
+
+.modal-sheet {
+  background: var(--dark-elevated);
+  border-radius: 24px 24px 0 0;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--dark-border);
+  animation: slide-up-modal 0.3s ease;
+}
+
+@keyframes slide-up-modal {
+  from{transform:translateY(100%)}
+  to{transform:translateY(0)}
+}
+
+/* ── Category Tabs ── */
+.cat-tab {
+  padding: 8px 16px;
+  border-radius: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--dark-border);
+  background: var(--frosted);
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.cat-tab.active {
+  background: var(--gold);
+  color: #000;
+  border-color: var(--gold);
+}
+
+/* ── Diet Chip ── */
+.diet-chip {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--frosted);
+  border: 1px solid var(--dark-border);
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.diet-chip.active {
+  background: rgba(76,175,125,0.15);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* ── Chat Bubbles ── */
+.chat-bubble-user {
+  align-self: flex-end;
+  background: var(--gold);
+  color: #000;
+  padding: 10px 14px;
+  border-radius: 18px 18px 4px 18px;
+  max-width: 75%;
+  font-size: 13px;
+}
+
+.chat-bubble-ai {
+  align-self: flex-start;
+  background: var(--frosted);
+  border: 1px solid var(--dark-border);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 4px;
+  max-width: 85%;
+  font-size: 13px;
+}
+
+.chat-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* ── Typing Indicator ── */
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typing-bounce 1.2s infinite;
+}
+
+@keyframes typing-bounce {
+  0%,60%,100%{transform:translateY(0)}
+  30%{transform:translateY(-6px)}
+}
+
+/* ── Order Stepper ── */
+.step-line {
+  position: absolute;
+  left: 14px;
+  top: 28px;
+  bottom: -28px;
+  width: 2px;
+  background: var(--dark-border);
+}
+
+.step-line.done {
+  background: var(--gold);
+}
+
+/* ── Scrollbar Hiding ── */
+::-webkit-scrollbar{display:none}
+*{scrollbar-width:none}
+
+/* ── Utility ── */
+.no-select {
+  user-select: none;
+}
+
+/* ── Slide-up Animation ── */
+@keyframes slide-up {
+  from{opacity:0;transform:translateY(20px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.anim-card {
+  animation: slide-up 0.4s ease both;
+}
+
+/* ── Stars ── */
+.star-filled {
+  color: var(--gold);
+}
+
+.star-empty {
+  color: var(--dark-border);
+}
+
+/* ── Product Grid ── */
+.product-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* ── Section Title ── */
+.section-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  padding: 12px 16px 4px;
+}
+
+/* ── Pill Bar ── */
+.pill-bar {
+  background: var(--frosted);
+  border: 1px solid var(--dark-border);
+  border-radius: 24px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* ── Scroll Row ── */
+.scroll-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 16px;
+  scrollbar-width: none;
+}
+
+.scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Frosted Card ── */
+.frosted-card {
+  background: var(--frosted);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--frosted-border);
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 16px;
+}
+
+/* ── Loyalty Tier Card ── */
+.tier-card {
+  background: linear-gradient(135deg, #1a1400, #2d2400, #1a1400);
+  border: 1px solid var(--gold);
+  border-radius: 20px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tier-card::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(212,175,55,0.2), transparent 70%);
+  border-radius: 50%;
+}
+
+/* ── AR Mirror ── */
+.ar-video-container {
+  position: relative;
+  border-radius: 50% / 60%;
+  overflow: hidden;
+  aspect-ratio: 3/4;
+  max-height: 340px;
+  margin: 0 auto;
+  border: 2px solid var(--gold);
+}
+
+@keyframes pulse-ring {
+  0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,0.4)}
+  50%{box-shadow:0 0 0 12px rgba(212,175,55,0)}
+}
+
+.pulse-ring {
+  animation: pulse-ring 2s infinite;
+}
+
+/* ── Hero Banner ── */
+.hero-banner {
+  background: linear-gradient(135deg, rgba(212,175,55,0.08), rgba(192,112,32,0.06));
+  border: 1px solid rgba(212,175,55,0.2);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  margin: 8px 16px;
+  min-height: 110px;
+}
+
+@keyframes pulsing-dot {
+  0%,100%{opacity:1}
+  50%{opacity:0.4}
+}
+
+/* ── Progress Bar ── */
+.progress-track {
+  height: 4px;
+  background: var(--frosted);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, var(--bronze), var(--gold));
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* ── Shade Swatch ── */
+.shade-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.shade-swatch.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.3);
+}
+
+/* ── Driver Avatar ── */
+.driver-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--bronze), var(--gold));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+  flex-shrink: 0;
+}
+
+/* ── Payment Option ── */
+.payment-option {
+  background: var(--frosted);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid var(--frosted-border);
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.payment-option.selected {
+  border-color: var(--gold);
+}
+
+.radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--dark-border);
+  flex-shrink: 0;
+}
+
+.payment-option.selected .radio-dot {
+  border-color: var(--gold);
+  background: var(--gold);
+}
+
+/* ── Delivery Slot ── */
+.delivery-slot {
+  flex: 1;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--frosted-border);
+  cursor: pointer;
+  text-align: center;
+  background: var(--frosted);
+  transition: all 0.2s;
+}
+
+.delivery-slot.active {
+  border-color: var(--gold);
+  background: rgba(212,175,55,0.06);
+}
+
+/* ── Detail Tabs ── */
+.detail-tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.detail-tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+/* ── Review Card ── */
+.review-card {
+  background: var(--frosted);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--frosted-border);
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+/* ── Billing Row ── */
+.billing-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--dark-border);
+}
+
+.billing-row:last-child {
+  border-bottom: none;
+}
+
+.billing-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  font-family: var(--font-serif);
+}
+
+/* ── Order Status Badge ── */
+.order-status-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-placed {
+  background: rgba(212,175,55,0.15);
+  color: var(--gold);
+}
+
+.badge-confirmed {
+  background: rgba(76,175,125,0.15);
+  color: var(--success);
+}
+
+.badge-packed {
+  background: rgba(100,150,255,0.15);
+  color: #6496ff;
+}
+
+.badge-out {
+  background: rgba(255,160,50,0.15);
+  color: #ffa032;
+}
+
+.badge-delivered {
+  background: rgba(76,175,125,0.2);
+  color: var(--success);
+}
+
+/* ── Hidden ── */
+.no-screen {
+  display: none;
+}
+</head><body><div id="app-wrapper"><div id="toast-container"></div><div id="modal-overlay"></div><div id="screen" id="screen"></div><nav id="bottom-nav"></nav></div>
+
+/* ── Font swap ── */
+@font-face { font-display: swap; }
+
+/* ── Skeleton loader ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--dark-elevated) 25%, var(--dark-card) 50%, var(--dark-elevated) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s infinite;
+  border-radius: 8px;
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-card { height: 180px; border-radius: 16px; }
+.skeleton-text  { height: 12px; width: 80%; margin: 6px 0; }
+.skeleton-text.short { width: 50%; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── Focus visible ── */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Undo toast action ── */
+.toast-action { background: none; border: none; color: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; margin-left: 8px; font-size: inherit; }
+
+/* ── Recommendation strip ── */
+.rec-strip { padding: 0 16px 16px; }
+.rec-strip-title { font-family: var(--font-serif); font-size: 15px; color: var(--text-muted); margin-bottom: 8px; }
+
+/* ── Comparison grid (AR) ── */
+.shade-compare-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 12px; }
+.shade-compare-item { border-radius: 12px; overflow: hidden; aspect-ratio: 3/4; border: 2px solid transparent; cursor: pointer; position: relative; }
+.shade-compare-item.active { border-color: var(--gold); }
+.shade-compare-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 3px 6px; text-align: center; }
+
+/* ── PWA install banner ── */
+#pwa-banner { position: absolute; top: 0; left: 0; right: 0; background: linear-gradient(135deg,var(--bronze),var(--gold)); color: #000; padding: 10px 16px; display: flex; align-items: center; gap: 10px; z-index: 50; font-size: 12px; font-weight: 600; }
+#pwa-banner button { background: #000; color: var(--gold); border: none; border-radius: 16px; padding: 5px 12px; cursor: pointer; font-weight: 700; font-size: 11px; white-space: nowrap; }
+#pwa-banner .dismiss { background: none; color: #000; font-size: 16px; padding: 0 4px; }
+
+/* ── Typing indicator ── */
+.typing-indicator { display: flex; gap: 4px; align-items: center; }
+.typing-dot { animation-delay: calc(var(--i) * 0.2s); }
+
+/* ── Skeleton shimmer ── */
+@keyframes skeleton-pulse {
+  0%,100%{opacity:0.5}
+  50%{opacity:1}
+}
+@media (prefers-reduced-motion: reduce) {
+  *,::before,::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; }
+}
+
+/* ── Focus visible ── */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* ── Toast action button ── */
+.toast-action { margin-left:10px;background:rgba(0,0,0,0.2);border:none;color:inherit;padding:3px 8px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700; }
+
+/* ── Typing indicator ── */
+.typing-dot { width:7px;height:7px;border-radius:50%;background:var(--gold);animation:typing-bounce 1s infinite; }
+@keyframes typing-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+
+/* ── Rec strip ── */
+.rec-strip { display:flex;gap:10px;overflow-x:auto;padding:0 16px;-ms-overflow-style:none;scrollbar-width:none; }
+.rec-strip::-webkit-scrollbar { display:none; }
+
+/* ── Shade swatch active ── */
+.shade-swatch { border-radius:50%;cursor:pointer;transition:transform 0.15s;border:2px solid transparent; }
+.shade-swatch.active { transform:scale(1.2);border-color:var(--gold) !important; }
+
+/* ── PWA install banner ── */
+.pwa-banner { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--dark-elevated);border:1px solid var(--dark-border);border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:999;max-width:390px;width:calc(100% - 32px); }
+
+/* ── Pill bar ── */
+.pill-bar { display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--frosted);border:1px solid var(--frosted-border);border-radius:12px; }
